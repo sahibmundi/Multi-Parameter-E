@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Multi-Parameter Environmental Monitoring System"
+version = "1.0.0"
+id = "artifacts/envmonitor"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22381
+
+[services.development]
+run = "pnpm --filter @workspace/envmonitor run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/envmonitor", "run", "build" ]
+publicDir = "artifacts/envmonitor/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22381"
+BASE_PATH = "/"

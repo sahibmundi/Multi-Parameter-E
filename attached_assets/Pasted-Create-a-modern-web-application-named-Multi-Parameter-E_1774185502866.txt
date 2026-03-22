@@ -1,0 +1,124 @@
+Create a modern web application named **"Multi-Parameter Environmental Monitoring and Adaptive Voice-Based Hazard Communication System"**.
+
+### 📡 Data Source:
+
+Fetch real-time data from ThingSpeak:
+
+* Channel 1 Read API Key: 14MJF61HHABCGD9P
+* Channel 2 Read API Key: VJHHEWZOX2O3AX5Q
+
+### 🌍 Parameters to Display:
+
+* CO2
+* Smoke
+* NH3
+* Benzene
+* LPG
+* Dust
+* Rain
+* Pressure
+* Temperature
+* Humidity
+* Altitude
+
+### 📊 Graphs:
+
+* Create individual graph for EACH parameter
+* Show real-time + historical trends
+* Auto-update graphs
+* Allow zoom and hover interaction
+
+### 📥 CSV Download:
+
+* Add "Download CSV" button on each graph
+* Add "Download All Data" option
+
+### 🧠 Smart Data Processing:
+
+* Analyze all sensor values
+
+* Show status:
+
+  * Good (green)
+  * Moderate (yellow)
+  * Dangerous (red)
+
+* Add overall environmental index:
+
+  * Example: "Environment Score: 78/100"
+
+* Show insights:
+
+  * "CO2 increasing"
+  * "Air quality worsening"
+
+### 🔊 Adaptive Voice-Based Hazard Communication:
+
+* Add microphone button
+* Enable speech recognition
+
+User can ask:
+
+* "What is temperature?"
+* "Tell me CO2 level"
+* "Is air quality safe?"
+* "Is it raining?"
+
+System should:
+
+* Understand query
+
+* Fetch latest sensor value
+
+* Speak response using male voice
+
+* Also automatically give alerts:
+
+  * "Warning! Air quality is dangerous"
+  * "Rain detected"
+
+### 🌐 Multi-language Support:
+
+* English
+* Hindi
+* Punjabi
+* Voice + UI both change with language
+
+### 🎨 UI Design:
+
+* Futuristic AI dashboard
+* Glassmorphism / neon theme
+* Animated cards for each parameter
+* Color-based status indicators
+
+### 🌙 Theme:
+
+* Light mode
+* Dark mode toggle
+
+### ⚡ Real-time:
+
+* Auto-refresh data continuously
+
+### 🔔 Alerts:
+
+* Highlight dangerous values
+* Show warning banners
+* Critical full-screen alert mode
+
+### 📱 Dashboard Layout:
+
+* Sensor cards
+* Graphs for all parameters
+* Overall environment status
+* Last updated time
+* Connection status
+
+### ⚙️ Additional Features:
+
+* Show "Connected / Disconnected"
+* Add loading animation
+* Add time filters (1h, 6h, 24h)
+* Fully responsive design
+
+Make the application intelligent, interactive, and capable of real-time monitoring, analysis, and adaptive voice-based hazard communication.

@@ -1,0 +1,17 @@
+packages:
+  "recharts": "Interactive charts for sensor data"
+  "framer-motion": "Animations for glassmorphism UI, pulsing alerts, and voice assistant"
+  "zustand": "Global state management for theme, language, and voice assistant"
+  "date-fns": "Formatting timestamps from ThingSpeak"
+  "clsx": "Utility for conditionally joining classNames"
+  "tailwind-merge": "Utility for merging tailwind classes without style conflicts"
+
+images:
+  - path: "artifacts/envmonitor/public/images/cyber-bg.png"
+    description: "Dark deep space cyberpunk background with subtle neon grid lines and faint cyan/magenta volumetric lighting, 8k resolution, highly detailed, dark mode aesthetic"
+    aspect_ratio: "16:9"
+
+notes:
+  - Application uses ThingSpeak API directly from the frontend (no backend proxy needed).
+  - Uses Web Speech API for voice recognition and synthesis. Requires browser support (Chrome/Edge/Safari).
+  - Uses localStorage for persisting theme and language settings.
