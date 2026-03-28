@@ -52,21 +52,21 @@ export function ParameterCard({ config, data, onClick, isActive }: ParameterCard
       whileHover={{ y: -5, scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
       onClick={onClick}
-      className={`glass-card p-5 rounded-xl cursor-pointer transition-all duration-300 relative overflow-hidden group ${glowClass} ${status === 'DANGEROUS' && data ? 'animate-pulse-fast' : ''}`}
+      className={`glass-card p-3 rounded-xl cursor-pointer transition-all duration-300 relative overflow-hidden group ${glowClass} ${status === 'DANGEROUS' && data ? 'animate-pulse-fast' : ''}`}
     >
       {/* Decorative background grid line for cyberpunk feel */}
       <div className="absolute inset-0 opacity-10 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.2)_50%,transparent_75%,transparent_100%)] bg-[length:4px_4px] mix-blend-overlay group-hover:opacity-20 transition-opacity"></div>
       
       <div className="relative z-10 flex justify-between items-start">
         <div className="flex flex-col">
-          <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-1">
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
             {t[config.nameKey as keyof typeof t] as string}
           </span>
           <div className="flex items-baseline gap-1">
-            <span className={`text-4xl font-display font-bold ${textClass}`}>
+            <span className={`text-2xl font-display font-bold ${textClass}`}>
               {value}
             </span>
-            <span className="text-sm text-muted-foreground font-medium ml-1">
+            <span className="text-xs text-muted-foreground font-medium ml-1">
               {config.unit}
             </span>
           </div>
@@ -77,7 +77,7 @@ export function ParameterCard({ config, data, onClick, isActive }: ParameterCard
         </div>
       </div>
 
-      <div className="mt-4 flex items-center justify-between">
+      <div className="mt-2 flex items-center justify-between">
         <span className={`text-xs font-bold uppercase tracking-widest ${textClass}`}>
           {data ? t[`status${status.charAt(0) + status.slice(1).toLowerCase()}` as keyof typeof t] as string : "---"}
         </span>
