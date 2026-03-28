@@ -264,13 +264,6 @@ export default function Dashboard() {
               <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">Refresh</span>
             </button>
-            <button 
-              onClick={handleDownloadAll}
-              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl transition-colors font-medium shadow-[0_0_15px_hsl(var(--primary)/0.4)] hover:shadow-[0_0_25px_hsl(var(--primary)/0.6)] hover:-translate-y-0.5 active:translate-y-0"
-            >
-              <Download className="w-4 h-4" />
-              <span>{t.downloadAll}</span>
-            </button>
           </div>
         </div>
 
@@ -287,10 +280,23 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* Main Focus Chart */}
-        <div className="mt-8" id="detailed-chart">
-           <h2 className="text-2xl font-display font-bold text-foreground mb-4">{t.historicalData}</h2>
-           <ParameterChart config={selectedParamConfig} data={selectedParamData} />
+        {/* Historical Analysis — all parameters */}
+        <div className="mt-10">
+          <div className="flex items-center gap-3 mb-6 pb-3 border-b border-border/50">
+            <div className="w-1 h-8 bg-primary rounded-full shadow-[0_0_10px_hsl(var(--primary))]" />
+            <h2 className="text-2xl font-display font-bold text-foreground tracking-wide">
+              Historical Analysis
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {PARAMETERS.map((config) => (
+              <ParameterChart
+                key={config.id}
+                config={config}
+                data={historicalData[config.id] || []}
+              />
+            ))}
+          </div>
         </div>
       </div>
 
