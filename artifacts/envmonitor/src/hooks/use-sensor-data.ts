@@ -23,19 +23,19 @@ export interface ParameterConfig {
 }
 
 export const PARAMETERS: ParameterConfig[] = [
-  // Channel 1
-  { id: 'co2', nameKey: 'CO2', unit: 'ppm', channel: 1, field: 'field1', evaluate: (v) => v > 2000 ? 'DANGEROUS' : v > 1000 ? 'MODERATE' : 'GOOD' },
-  { id: 'smoke', nameKey: 'Smoke', unit: 'ppm', channel: 1, field: 'field2', evaluate: (v) => v > 500 ? 'DANGEROUS' : v > 200 ? 'MODERATE' : 'GOOD' },
-  { id: 'nh3', nameKey: 'NH3', unit: 'ppm', channel: 1, field: 'field3', evaluate: (v) => v > 50 ? 'DANGEROUS' : v > 25 ? 'MODERATE' : 'GOOD' },
-  { id: 'benzene', nameKey: 'Benzene', unit: 'ppb', channel: 1, field: 'field4', evaluate: (v) => v > 5 ? 'DANGEROUS' : v > 1 ? 'MODERATE' : 'GOOD' },
-  { id: 'lpg', nameKey: 'LPG', unit: 'ppm', channel: 1, field: 'field5', evaluate: (v) => v > 2000 ? 'DANGEROUS' : v > 1000 ? 'MODERATE' : 'GOOD' },
-  { id: 'dust', nameKey: 'Dust', unit: 'μg/m³', channel: 1, field: 'field6', evaluate: (v) => v > 35 ? 'DANGEROUS' : v > 12 ? 'MODERATE' : 'GOOD' },
-  // Channel 2
-  { id: 'rain', nameKey: 'Rain', unit: 'mm', channel: 2, field: 'field1', evaluate: (v) => v > 50 ? 'DANGEROUS' : v > 10 ? 'MODERATE' : 'GOOD' }, // Assuming raw value to somewhat arbitrary thresholds for demo
-  { id: 'pressure', nameKey: 'Pressure', unit: 'hPa', channel: 2, field: 'field2', evaluate: (v) => v < 980 || v > 1050 ? 'DANGEROUS' : v < 1000 ? 'MODERATE' : 'GOOD' },
-  { id: 'temperature', nameKey: 'Temperature', unit: '°C', channel: 2, field: 'field3', evaluate: (v) => v > 35 || v < 10 ? 'DANGEROUS' : (v >= 28 && v <= 35) || (v >= 10 && v < 18) ? 'MODERATE' : 'GOOD' },
-  { id: 'humidity', nameKey: 'Humidity', unit: '%', channel: 2, field: 'field4', evaluate: (v) => v > 80 || v < 20 ? 'DANGEROUS' : (v >= 60 && v <= 80) || (v >= 20 && v < 30) ? 'MODERATE' : 'GOOD' },
-  { id: 'altitude', nameKey: 'Altitude', unit: 'm', channel: 2, field: 'field5', evaluate: () => 'GOOD' }, // Altitude usually doesn't have a danger rating itself in this context
+  // Channel 1: field1-field8
+  { id: 'co2',         nameKey: 'CO2',         unit: 'ppm',   channel: 1, field: 'field1', evaluate: (v) => v > 2000 ? 'DANGEROUS' : v > 1000 ? 'MODERATE' : 'GOOD' },
+  { id: 'smoke',       nameKey: 'Smoke',       unit: 'ppm',   channel: 1, field: 'field2', evaluate: (v) => v > 500  ? 'DANGEROUS' : v > 200  ? 'MODERATE' : 'GOOD' },
+  { id: 'nh3',         nameKey: 'NH3',         unit: 'ppm',   channel: 1, field: 'field3', evaluate: (v) => v > 50   ? 'DANGEROUS' : v > 25   ? 'MODERATE' : 'GOOD' },
+  { id: 'benzene',     nameKey: 'Benzene',     unit: 'ppb',   channel: 1, field: 'field4', evaluate: (v) => v > 5    ? 'DANGEROUS' : v > 1    ? 'MODERATE' : 'GOOD' },
+  { id: 'lpg',         nameKey: 'LPG',         unit: 'ppm',   channel: 1, field: 'field5', evaluate: (v) => v > 2000 ? 'DANGEROUS' : v > 1000 ? 'MODERATE' : 'GOOD' },
+  { id: 'dust',        nameKey: 'Dust',        unit: 'μg/m³', channel: 1, field: 'field6', evaluate: (v) => v > 35   ? 'DANGEROUS' : v > 12   ? 'MODERATE' : 'GOOD' },
+  { id: 'rain',        nameKey: 'Rain',        unit: '%',     channel: 1, field: 'field7', evaluate: (v) => v > 80   ? 'DANGEROUS' : v > 40   ? 'MODERATE' : 'GOOD' },
+  { id: 'pressure',    nameKey: 'Pressure',    unit: 'hPa',   channel: 1, field: 'field8', evaluate: (v) => v < 980  ? 'DANGEROUS' : v < 1000 ? 'MODERATE' : 'GOOD' },
+  // Channel 2: field1-field3
+  { id: 'temperature', nameKey: 'Temperature', unit: '°C',    channel: 2, field: 'field1', evaluate: (v) => v > 35 || v < 10 ? 'DANGEROUS' : v > 28 || v < 18 ? 'MODERATE' : 'GOOD' },
+  { id: 'humidity',    nameKey: 'Humidity',    unit: '%',     channel: 2, field: 'field2', evaluate: (v) => v > 80   ? 'DANGEROUS' : v > 60   ? 'MODERATE' : 'GOOD' },
+  { id: 'altitude',    nameKey: 'Altitude',    unit: 'm',     channel: 2, field: 'field3', evaluate: () => 'GOOD' },
 ];
 
 interface FeedData {
