@@ -1,0 +1,987 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:speech_to_text/speech_to_text.dart';
+import 'package:flutter_tts/flutter_tts.dart';
+import 'services.dart';
+import 'widgets.dart';
+import 'translations.dart';
+
+// ═══════════════════════════════════════════════════
+//  ENTRY POINT
+// ═══════════════════════════════════════════════════
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => AppState(),
+      child: const EnvMonitorApp(),
+    ),
+  );
+}
+
+// ═══════════════════════════════════════════════════
+//  APP STATE
+// ═══════════════════════════════════════════════════
+
+class AppState extends ChangeNotifier {
+  bool isDark = true;
+  String lang = 'en';
+  String ch1Id = '';
+  String ch2Id = '';
+  Map<String, SensorReading> readings = {};
+  bool isLoading = false;
+  bool isConnected = false;
+  String? error;
+  DateTime? lastUpdated;
+  bool isListening = false;
+  String voiceQuery = '';
+  String voiceResponse = '';
+  bool alertDismissed = false;
+  Timer? _timer;
+
+  AppState() {
+    _loadPrefs();
+  }
+
+  int get score {
+    if (readings.isEmpty) return 100;
+    int s = 100;
+    for (final r in readings.values) {
+      if (r.id == 'Altitude') continue;
+      if (r.status == Status.dangerous) s -= 20;
+      else if (r.status == Status.moderate) s -= 5;
+    }
+    return s.clamp(0, 100);
+  }
+
+  int get dangerCount =>
+      readings.values.where((r) => r.status == Status.dangerous).length;
+
+  bool get needsConfig => ch1Id.isEmpty || ch2Id.isEmpty;
+
+  String get formattedLastUpdated {
+    if (lastUpdated == null) return '';
+    final h = lastUpdated!.hour.toString().padLeft(2, '0');
+    final m = lastUpdated!.minute.toString().padLeft(2, '0');
+    final s = lastUpdated!.second.toString().padLeft(2, '0');
+    return '$h:$m:$s';
+  }
+
+  Future<void> _loadPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    isDark = prefs.getBool('isDark') ?? true;
+    lang = prefs.getString('lang') ?? 'en';
+    ch1Id = prefs.getString('ch1Id') ?? '';
+    ch2Id = prefs.getString('ch2Id') ?? '';
+    notifyListeners();
+    if (!needsConfig) startAutoRefresh();
+  }
+
+  Future<void> saveSettings({
+    required String newCh1,
+    required String newCh2,
+  }) async {
+    ch1Id = newCh1.trim();
+    ch2Id = newCh2.trim();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('ch1Id', ch1Id);
+    await prefs.setString('ch2Id', ch2Id);
+    notifyListeners();
+    if (!needsConfig) {
+      await fetchData();
+      startAutoRefresh();
+    }
+  }
+
+  Future<void> setTheme(bool dark) async {
+    isDark = dark;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isDark', dark);
+    notifyListeners();
+  }
+
+  Future<void> setLang(String l) async {
+    lang = l;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('lang', l);
+    notifyListeners();
+  }
+
+  void startAutoRefresh() {
+    _timer?.cancel();
+    fetchData();
+    _timer = Timer.periodic(const Duration(seconds: 30), (_) => fetchData());
+  }
+
+  Future<void> fetchData() async {
+    if (needsConfig) return;
+    isLoading = readings.isEmpty;
+    error = null;
+    notifyListeners();
+    try {
+      final data = await ThingSpeakService.fetchAll(
+          ch1Id: ch1Id, ch2Id: ch2Id);
+      readings = data;
+      isConnected = true;
+      lastUpdated = DateTime.now();
+      if (dangerCount < 3) alertDismissed = false;
+    } catch (e) {
+      isConnected = false;
+      error = e.toString();
+    }
+    isLoading = false;
+    notifyListeners();
+  }
+
+  void dismissAlert() {
+    alertDismissed = true;
+    notifyListeners();
+  }
+
+  void updateVoiceState({
+    bool? isListening,
+    String? voiceQuery,
+    String? voiceResponse,
+  }) {
+    if (isListening != null) {
+      this.isListening = isListening;
+    }
+    if (voiceQuery != null) {
+      this.voiceQuery = voiceQuery;
+    }
+    if (voiceResponse != null) {
+      this.voiceResponse = voiceResponse;
+    }
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  APP ROOT
+// ═══════════════════════════════════════════════════
+
+class EnvMonitorApp extends StatelessWidget {
+  const EnvMonitorApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<AppState>(
+      builder: (_, state, __) => MaterialApp(
+        title: 'ENV Monitor',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          brightness:
+              state.isDark ? Brightness.dark : Brightness.light,
+          scaffoldBackgroundColor:
+              state.isDark ? kBg : const Color(0xFFF0F4FF),
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: kCyan,
+            brightness:
+                state.isDark ? Brightness.dark : Brightness.light,
+          ),
+          textTheme: GoogleFonts.rajdhaniTextTheme().apply(
+            bodyColor:
+                state.isDark ? Colors.white : Colors.black87,
+          ),
+        ),
+        home: const DashboardScreen(),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  DASHBOARD SCREEN
+// ═══════════════════════════════════════════════════
+class DashboardScreen extends StatefulWidget {
+  
+  const DashboardScreen({super.key});
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  final SpeechToText _stt = SpeechToText();
+  final FlutterTts _tts = FlutterTts();
+  bool _sttAvailable = false;
+  String _lastWords = '';
+  AppState? _appState;
+
+  @override
+  void initState() {
+    super.initState();
+    _initVoice();
+  }
+
+  Future<void> _initVoice() async {
+    // Request microphone permission
+    final hasPermission = await _stt.initialize(
+      onError: (e) => debugPrint('STT Error: ${e.errorMsg}'),
+      onStatus: (s) => debugPrint('STT Status: $s'),
+    );
+
+    _sttAvailable = hasPermission;
+
+    await _tts.setPitch(0.85);
+    await _tts.setSpeechRate(0.9);
+    await _tts.setVolume(1.0);
+    setState(() {});
+  }
+
+  Future<void> _toggleListening(AppState state) async {
+    _appState = state;
+
+    if (!_sttAvailable) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Microphone permission not granted'),
+          backgroundColor: kRed,
+        ),
+      );
+      return;
+    }
+
+    if (state.isListening) {
+      await _stt.stop();
+      state.isListening = false;
+      state.notifyListeners();
+      return;
+    }
+
+    _lastWords = '';
+    state.isListening = true;
+    state.voiceQuery = '';
+    state.voiceResponse = '';
+    state.notifyListeners();
+
+    final langMap = {'en': 'en-US', 'hi': 'hi-IN', 'pa': 'pa-IN'};
+    final localeId = langMap[state.lang] ?? 'en-US';
+    await _tts.setLanguage(localeId);
+
+    await _stt.listen(
+      localeId: localeId,
+      listenFor: const Duration(seconds: 15),
+      pauseFor: const Duration(seconds: 3),
+      partialResults: true,
+      onResult: (result) {
+        debugPrint('onResult: "${result.recognizedWords}" final=${result.finalResult}');
+
+        if (result.recognizedWords.isNotEmpty) {
+          _lastWords = result.recognizedWords;
+        }
+
+        if (result.finalResult && result.recognizedWords.isNotEmpty) {
+          state.isListening = false;
+          state.voiceQuery = result.recognizedWords;
+          state.notifyListeners();
+
+          _processVoice(state, result.recognizedWords);
+          _lastWords = '';
+        }
+      },
+    );
+  }
+
+  void _processVoice(AppState state, String query) {
+    final q = query.toLowerCase().trim();
+    String response = '';
+
+    for (final cfg in paramConfigs) {
+      final idKey = cfg.id.toLowerCase();
+      final nameEn = t('en', cfg.id).toLowerCase();
+      final nameLang = t(state.lang, cfg.id).toLowerCase();
+
+      if (q.contains(idKey) || q.contains(nameEn) || q.contains(nameLang)) {
+        final r = state.readings[cfg.id];
+        if (r != null) {
+          final statusStr = r.status == Status.good
+              ? t(state.lang, 'good')
+              : r.status == Status.moderate
+                  ? t(state.lang, 'moderate')
+                  : t(state.lang, 'dangerous');
+
+          switch (state.lang) {
+            case 'hi':
+              response = '${t('hi', cfg.id)} ${r.value.toStringAsFixed(1)} ${cfg.unit} है। स्थिति $statusStr है।';
+              break;
+            case 'pa':
+              response = '${t('pa', cfg.id)} ${r.value.toStringAsFixed(1)} ${cfg.unit} ਹੈ। ਸਥਿਤੀ $statusStr ਹੈ।';
+              break;
+            default:
+              response = '${t('en', cfg.id)} is ${r.value.toStringAsFixed(1)} ${cfg.unit}. Status is $statusStr.';
+          }
+        } else {
+          response = 'No data available for ${t('en', cfg.id)} yet.';
+        }
+        break;
+      }
+    }
+
+    // Score
+    if (response.isEmpty &&
+        (q.contains('score') || q.contains('स्कोर') || q.contains('ਸਕੋਰ'))) {
+      response = state.lang == 'en'
+          ? 'Environment score is ${state.score} out of 100.'
+          : state.lang == 'hi'
+              ? 'पर्यावरण स्कोर ${state.score} है।'
+              : 'ਵਾਤਾਵਰਣ ਸਕੋਰ ${state.score} ਹੈ।';
+    }
+
+    // Safety
+    if (response.isEmpty &&
+        (q.contains('safe') || q.contains('quality') || q.contains('air') ||
+            q.contains('सुरक्षित') || q.contains('ਸੁਰੱਖਿਅਤ'))) {
+      if (state.dangerCount == 0) {
+        response = state.lang == 'en'
+            ? 'Yes, all parameters are within safe limits.'
+            : state.lang == 'hi'
+                ? 'हां, सभी पैरामीटर सुरक्षित हैं।'
+                : 'ਹਾਂ, ਸਾਰੇ ਪੈਰਾਮੀਟਰ ਸੁਰੱਖਿਅਤ ਹਨ।';
+      } else {
+        final names = state.readings.values
+            .where((r) => r.status == Status.dangerous)
+            .map((r) => t(state.lang, r.id))
+            .join(', ');
+        response = state.lang == 'en'
+            ? 'Warning! ${state.dangerCount} parameter(s) are critical: $names'
+            : state.lang == 'hi'
+                ? 'चेतावनी! $names खतरनाक स्तर पर है।'
+                : 'ਚੇਤਾਵਨੀ! $names ਖਤਰਨਾਕ ਹੈ।';
+      }
+    }
+
+    if (response.isEmpty) {
+      response = state.lang == 'en'
+          ? 'I did not understand. Try saying temperature, CO2, smoke, humidity, or score.'
+          : state.lang == 'hi'
+              ? 'मैं समझ नहीं पाया। तापमान या CO2 के बारे में पूछें।'
+              : 'ਮੈਂ ਸਮਝ ਨਹੀਂ ਸਕਿਆ। ਤਾਪਮਾਨ ਬਾਰੇ ਪੁੱਛੋ।';
+    }
+
+    state.voiceResponse = response;
+    state.notifyListeners();
+
+    // Speak the response
+    _tts.speak(response);
+  }
+
+  // ... Rest of your code remains exactly the same (_buildHeader, _buildSetupBanner, etc.)
+
+  void _showSettings(BuildContext context, AppState state) {
+    final c1 = TextEditingController(text: state.ch1Id);
+    final c2 = TextEditingController(text: state.ch2Id);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: kCard,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => Padding(
+        padding: MediaQuery.of(context).viewInsets + const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                    color: kMuted, borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(children: [
+              const Icon(Icons.settings_input_antenna, color: kCyan, size: 22),
+              const SizedBox(width: 10),
+              Text(t(state.lang, 'settings'),
+                  style: GoogleFonts.orbitron(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold)),
+            ]),
+            const SizedBox(height: 6),
+            Text('Enter your ThingSpeak Channel IDs to connect live sensor data.',
+                style: TextStyle(color: kMuted, fontSize: 12)),
+            const SizedBox(height: 20),
+            _buildInputField(c1, t(state.lang, 'channel1Id'), 'e.g. 2345678'),
+            const SizedBox(height: 14),
+            _buildInputField(c2, t(state.lang, 'channel2Id'), 'e.g. 2345679'),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  if (c1.text.trim().isEmpty || c2.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text('Please enter both Channel IDs'),
+                          backgroundColor: kRed),
+                    );
+                    return;
+                  }
+                  state.saveSettings(newCh1: c1.text, newCh2: c2.text);
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Connecting to ThingSpeak...'),
+                        backgroundColor: kGreen),
+                  );
+                },
+                icon: const Icon(Icons.link, size: 18),
+                label: Text(t(state.lang, 'save'),
+                    style: GoogleFonts.orbitron(fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kCyan,
+                  foregroundColor: kBg,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInputField(
+      TextEditingController ctrl, String label, String hint) {
+    return TextField(
+      controller: ctrl,
+      keyboardType: TextInputType.number,
+      style: const TextStyle(color: Colors.white, fontSize: 16),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        labelStyle: TextStyle(color: kMuted),
+        hintStyle: TextStyle(color: kMuted.withOpacity(0.5)),
+        filled: true,
+        fillColor: Colors.white.withOpacity(0.05),
+        prefixIcon: const Icon(Icons.tag, color: kCyan, size: 18),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: kCyan.withOpacity(0.3))),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: kCyan.withOpacity(0.25))),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: kCyan, width: 1.5)),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<AppState>(
+      builder: (context, state, _) {
+        final showAlert = state.dangerCount >= 3 && !state.alertDismissed;
+
+        return Scaffold(
+          body: Stack(
+            children: [
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: CyberGridPainter(
+                    color: state.isDark
+                        ? const Color(0xFF0A1628)
+                        : const Color(0xFFDDE8FF),
+                  ),
+                ),
+              ),
+
+              SafeArea(
+                child: Column(
+                  children: [
+                    _buildHeader(context, state),
+                    Expanded(
+                      child: RefreshIndicator(
+                        onRefresh: state.fetchData,
+                        color: kCyan,
+                        backgroundColor: kCard,
+                        child: SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (state.needsConfig)
+                                _buildSetupBanner(context, state),
+
+                              if (!state.needsConfig) ...[
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                        flex: 2,
+                                        child: ScoreGauge(
+                                            score: state.score,
+                                            lang: state.lang)),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                        flex: 3,
+                                        child: _buildInsightsCard(state)),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+                              ],
+
+                              if (state.error != null) ...[
+                                GlassCard(
+                                  borderColor: kRed,
+                                  child: Row(children: [
+                                    const Icon(Icons.wifi_off,
+                                        color: kRed, size: 22),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(t(state.lang, 'errorFetch'),
+                                          style: const TextStyle(
+                                              color: kRed, fontSize: 13)),
+                                    ),
+                                    TextButton(
+                                      onPressed: state.fetchData,
+                                      child: Text(t(state.lang, 'refresh'),
+                                          style: const TextStyle(
+                                              color: kCyan, fontSize: 12)),
+                                    ),
+                                  ]),
+                                ),
+                                const SizedBox(height: 16),
+                              ],
+
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(t(state.lang, 'parameters'),
+                                      style: GoogleFonts.orbitron(
+                                          color: Colors.white,
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 1)),
+                                  if (state.lastUpdated != null)
+                                    Text(
+                                      '${t(state.lang, 'lastUpdated')}: ${state.formattedLastUpdated}',
+                                      style: TextStyle(
+                                          color: kMuted, fontSize: 10),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+
+                              GridView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                gridDelegate:
+                                    const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 2,
+                                  crossAxisSpacing: 8,
+                                  mainAxisSpacing: 8,
+                                  mainAxisExtent: 90,
+                                ),
+                                itemCount: paramConfigs.length,
+                                itemBuilder: (context, index) {
+                                  final cfg = paramConfigs[index];
+                                  return SensorCard(
+                                    paramId: cfg.id,
+                                    reading: state.readings[cfg.id],
+                                    lang: state.lang,
+                                    onTap: () =>
+                                        _openChartSheet(context, state, cfg.id),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              if (state.voiceQuery.isNotEmpty ||
+                  state.voiceResponse.isNotEmpty ||
+                  state.isListening)
+                Positioned(
+                  bottom: 88,
+                  right: 16,
+                  left: 70,
+                  child: GlassCard(
+                    borderColor: state.isListening ? kRed : kCyan,
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (state.isListening)
+                          Row(children: [
+                            const Icon(Icons.mic, color: kRed, size: 13),
+                            const SizedBox(width: 5),
+                            Text(t(state.lang, 'listening'),
+                                style: const TextStyle(
+                                    color: kRed,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold)),
+                          ]),
+                        if (state.voiceQuery.isNotEmpty) ...[
+                          if (state.isListening) const SizedBox(height: 6),
+                          Text('"${state.voiceQuery}"',
+                              style: TextStyle(
+                                  color: kMuted,
+                                  fontSize: 12,
+                                  fontStyle: FontStyle.italic)),
+                        ],
+                        if (state.voiceResponse.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text(state.voiceResponse,
+                              style: GoogleFonts.rajdhani(
+                                  color: kCyan,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600)),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+
+              Positioned(
+                bottom: 20,
+                right: 16,
+                child: _buildMicFAB(state),
+              ),
+
+              if (showAlert)
+                Positioned.fill(
+                  child: CriticalAlertOverlay(
+                    lang: state.lang,
+                    onDismiss: state.dismissAlert,
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildHeader(BuildContext context, AppState state) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: kCard.withOpacity(0.85),
+        border: Border(
+            bottom: BorderSide(color: kCyan.withOpacity(0.15), width: 1)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(t(state.lang, 'appTitle'),
+                style: GoogleFonts.orbitron(
+                    color: kCyan,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.5,
+                    shadows: [
+                      Shadow(color: kCyan.withOpacity(0.6), blurRadius: 10)
+                    ]),
+                overflow: TextOverflow.ellipsis),
+          ),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 500),
+            width: 8, height: 8,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: state.isConnected ? kGreen : kRed,
+              boxShadow: [
+                BoxShadow(
+                    color: (state.isConnected ? kGreen : kRed).withOpacity(0.7),
+                    blurRadius: 8,
+                    spreadRadius: 1)
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Container(
+            decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.07),
+                borderRadius: BorderRadius.circular(8)),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: ['en', 'hi', 'pa'].map((l) {
+                final isSelected = state.lang == l;
+                return GestureDetector(
+                  onTap: () => state.setLang(l),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? kCyan.withOpacity(0.18)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(7),
+                      border: Border.all(
+                          color: isSelected ? kCyan : Colors.transparent,
+                          width: 1),
+                    ),
+                    child: Text(l.toUpperCase(),
+                        style: TextStyle(
+                            color: isSelected ? kCyan : kMuted,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5)),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () => state.setTheme(!state.isDark),
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: Icon(
+                  state.isDark
+                      ? Icons.wb_sunny_outlined
+                      : Icons.nightlight_round,
+                  color: kMuted,
+                  size: 19),
+            ),
+          ),
+          const SizedBox(width: 6),
+          GestureDetector(
+            onTap: () => _showSettings(context, state),
+            child: const Padding(
+              padding: EdgeInsets.all(4),
+              child: Icon(Icons.tune, color: kMuted, size: 19),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSetupBanner(BuildContext context, AppState state) {
+    return Column(
+      children: [
+        GlassCard(
+          borderColor: kYellow,
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              const Icon(Icons.wifi_off, color: kYellow, size: 24),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(t(state.lang, 'configRequired'),
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14)),
+                    const SizedBox(height: 3),
+                    Text(t(state.lang, 'configHint'),
+                        style: TextStyle(color: kMuted, fontSize: 11)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              ElevatedButton(
+                onPressed: () => _showSettings(context, state),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kYellow,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 8),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+                child: Text(t(state.lang, 'configureNow'),
+                    style: const TextStyle(
+                        fontSize: 11, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildInsightsCard(AppState state) {
+    final dangerous = state.readings.values
+        .where((r) => r.status == Status.dangerous)
+        .toList();
+    final moderate = state.readings.values
+        .where((r) => r.status == Status.moderate)
+        .toList();
+
+    final Color insightColor = dangerous.isNotEmpty
+        ? kRed
+        : moderate.isNotEmpty
+            ? kYellow
+            : kGreen;
+
+    final String insightText = dangerous.isNotEmpty
+        ? t(state.lang, 'insightDanger')
+        : moderate.isNotEmpty
+            ? t(state.lang, 'insightWarning')
+            : t(state.lang, 'insightSafe');
+
+    return GlassCard(
+      borderColor: insightColor,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Icon(Icons.bolt, color: insightColor, size: 18),
+            const SizedBox(width: 6),
+            Text(t(state.lang, 'aiInsights'),
+                style: GoogleFonts.orbitron(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold)),
+          ]),
+          const SizedBox(height: 10),
+          if (state.isLoading)
+            const Center(
+              child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                      color: kCyan, strokeWidth: 2)),
+            )
+          else ...[
+            Text(insightText,
+                style: TextStyle(
+                    color: insightColor, fontSize: 11, height: 1.5)),
+            if (dangerous.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: dangerous
+                    .map((r) => Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: kRed.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: kRed.withOpacity(0.4)),
+                          ),
+                          child: Text(t(state.lang, r.id),
+                              style: const TextStyle(
+                                  color: kRed,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5)),
+                        ))
+                    .toList(),
+              ),
+            ],
+            if (dangerous.isEmpty && moderate.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: moderate
+                    .map((r) => Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: kYellow.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                                color: kYellow.withOpacity(0.4)),
+                          ),
+                          child: Text(t(state.lang, r.id),
+                              style: const TextStyle(
+                                  color: kYellow,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold)),
+                        ))
+                    .toList(),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _openChartSheet(BuildContext context, AppState state, String paramId) {
+    final reading = state.readings[paramId];
+    if (reading == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(t(state.lang, 'noData')),
+            backgroundColor: kMuted),
+      );
+      return;
+    }
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: kBg,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.6,
+        minChildSize: 0.4,
+        maxChildSize: 0.92,
+        builder: (_, ctrl) => SingleChildScrollView(
+          controller: ctrl,
+          child: ChartSheet(
+              paramId: paramId, reading: reading, lang: state.lang),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMicFAB(AppState state) {
+    return GestureDetector(
+      onTap: () => _toggleListening(state),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        width: 58, height: 58,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: state.isListening
+              ? kRed.withOpacity(0.15)
+              : kCyan.withOpacity(0.12),
+          border: Border.all(
+              color: state.isListening ? kRed : kCyan, width: 2),
+          boxShadow: [
+            BoxShadow(
+                color: (state.isListening ? kRed : kCyan).withOpacity(0.45),
+                blurRadius: 18,
+                spreadRadius: 2)
+          ],
+        ),
+        child: Icon(
+            state.isListening ? Icons.mic_off_rounded : Icons.mic_rounded,
+            color: state.isListening ? kRed : kCyan,
+            size: 28),
+      ),
+    );
+  }
+
+} // ← end of _DashboardScreenState
