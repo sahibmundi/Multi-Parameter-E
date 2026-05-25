@@ -1,0 +1,76 @@
+  String _lastWords = '';   // ← add this field at the top of _DashboardScreenState
+
+  Future<void> _toggleListening(AppState state) async {
+    if (!_sttAvailable) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Microphone not available'),
+          backgroundColor: kRed,
+        ),
+      );
+      return;
+    }
+
+    if (state.isListening) {
+      await _stt.stop();
+      state.isListening = false;
+      state.notifyListeners();
+      // Process whatever was heard so far
+      if (_lastWords.isNotEmpty) {
+        state.voiceQuery = _lastWords;
+        state.notifyListeners();
+        _processVoice(state, _lastWords);
+        _lastWords = '';
+      }
+      return;
+    }
+
+    _lastWords = '';
+    state.isListening = true;
+    state.voiceQuery = '';
+    state.voiceResponse = '';
+    state.notifyListeners();
+
+    final langMap = {'en': 'en-US', 'hi': 'hi-IN', 'pa': 'pa-IN'};
+    final localeId = langMap[state.lang] ?? 'en-US';
+    await _tts.setLanguage(localeId);
+
+    await _stt.listen(
+      localeId: localeId,
+      listenFor: const Duration(seconds: 15),
+      pauseFor: const Duration(seconds: 2),
+      partialResults: true,           // ← MUST be true to get any results
+      onResult: (result) {
+        // Always save whatever is recognized (partial or final)
+        if (result.recognizedWords.isNotEmpty) {
+          _lastWords = result.recognizedWords;
+        }
+
+        // If the engine marks it final, process immediately
+        if (result.finalResult && result.recognizedWords.isNotEmpty) {
+          state.isListening = false;
+          state.voiceQuery = result.recognizedWords;
+          state.notifyListeners();
+          _processVoice(state, result.recognizedWords);
+          _lastWords = '';
+        }
+      },
+    );
+
+    // KEY FIX: When STT stops (done/notListening), process last saved words
+    _stt.statusListener = (status) {
+      debugPrint('STT status: $status');
+      if ((status == 'done' || status == 'notListening') &&
+          state.isListening) {
+        state.isListening = false;
+        if (_lastWords.isNotEmpty) {
+          state.voiceQuery = _lastWords;
+          state.notifyListeners();
+          _processVoice(state, _lastWords);
+          _lastWords = '';
+        } else {
+          state.notifyListeners();
+        }
+      }
+    };
+  }
