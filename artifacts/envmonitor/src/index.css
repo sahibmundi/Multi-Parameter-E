@@ -1,9 +1,9 @@
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
 @theme inline {
-  --font-sans: 'Rajdhani', sans-serif;
-  --font-display: 'Orbitron', sans-serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-display: 'Nunito', sans-serif;
 
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
@@ -25,159 +25,181 @@
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
 
-  --color-neon-cyan: hsl(var(--neon-cyan));
-  --color-neon-magenta: hsl(var(--neon-magenta));
-  --color-neon-green: hsl(var(--neon-green));
-  --color-neon-yellow: hsl(var(--neon-yellow));
-  --color-neon-red: hsl(var(--neon-red));
+  --color-nature-green: hsl(var(--nature-green));
+  --color-sky-blue: hsl(var(--sky-blue));
+  --color-sun-amber: hsl(var(--sun-amber));
+  --color-storm-red: hsl(var(--storm-red));
 
+  --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   --animate-pulse-fast: pulse-fast 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  --animate-scanline: scanline 8s linear infinite;
+  --animate-float: float 6s ease-in-out infinite;
 }
 
 :root {
-  --background: 220 33% 98%;
-  --foreground: 222 47% 11%;
+  /* Light — Clear Sky Day */
+  --background: 204 60% 97%;
+  --foreground: 215 32% 12%;
   --card: 0 0% 100%;
-  --card-foreground: 222 47% 11%;
+  --card-foreground: 215 32% 12%;
   --popover: 0 0% 100%;
-  --popover-foreground: 222 47% 11%;
-  --primary: 221 83% 53%;
-  --primary-foreground: 210 40% 98%;
-  --secondary: 210 40% 96%;
-  --secondary-foreground: 222 47% 11%;
-  --muted: 210 40% 96%;
-  --muted-foreground: 215 16% 47%;
-  --accent: 210 40% 96%;
-  --accent-foreground: 222 47% 11%;
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 210 40% 98%;
-  --border: 214 32% 91%;
-  --input: 214 32% 91%;
-  --ring: 221 83% 53%;
-  --radius: 0.75rem;
+  --popover-foreground: 215 32% 12%;
+  --primary: 199 85% 42%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 200 40% 93%;
+  --secondary-foreground: 215 32% 12%;
+  --muted: 200 35% 92%;
+  --muted-foreground: 215 18% 46%;
+  --accent: 150 60% 42%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 4 86% 58%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 200 28% 86%;
+  --input: 200 28% 86%;
+  --ring: 199 85% 42%;
+  --radius: 1rem;
 
-  --neon-cyan: 190 100% 50%;
-  --neon-magenta: 320 100% 50%;
-  --neon-green: 150 100% 50%;
-  --neon-yellow: 50 100% 50%;
-  --neon-red: 0 100% 60%;
+  --nature-green: 145 72% 40%;
+  --sky-blue: 199 89% 48%;
+  --sun-amber: 38 96% 54%;
+  --storm-red: 4 86% 58%;
 }
 
 .dark {
-  --background: 240 10% 4%;
-  --foreground: 210 40% 98%;
-  --card: 240 10% 6%;
-  --card-foreground: 210 40% 98%;
-  --popover: 240 10% 6%;
-  --popover-foreground: 210 40% 98%;
-  --primary: 190 100% 50%;
-  --primary-foreground: 240 10% 4%;
-  --secondary: 240 10% 10%;
-  --secondary-foreground: 210 40% 98%;
-  --muted: 240 10% 10%;
-  --muted-foreground: 215 20% 65%;
-  --accent: 240 10% 15%;
-  --accent-foreground: 210 40% 98%;
-  --destructive: 0 100% 60%;
-  --destructive-foreground: 210 40% 98%;
-  --border: 240 10% 15%;
-  --input: 240 10% 15%;
-  --ring: 190 100% 50%;
+  /* Dark — Forest Night Sky */
+  --background: 215 42% 8%;
+  --foreground: 210 38% 94%;
+  --card: 215 38% 12%;
+  --card-foreground: 210 38% 94%;
+  --popover: 215 38% 12%;
+  --popover-foreground: 210 38% 94%;
+  --primary: 199 85% 60%;
+  --primary-foreground: 215 42% 8%;
+  --secondary: 215 32% 16%;
+  --secondary-foreground: 210 38% 94%;
+  --muted: 215 32% 16%;
+  --muted-foreground: 215 18% 55%;
+  --accent: 150 70% 50%;
+  --accent-foreground: 215 42% 8%;
+  --destructive: 4 90% 64%;
+  --destructive-foreground: 215 42% 8%;
+  --border: 215 28% 20%;
+  --input: 215 28% 20%;
+  --ring: 199 85% 60%;
+
+  --nature-green: 145 68% 52%;
+  --sky-blue: 199 89% 60%;
+  --sun-amber: 38 94% 60%;
+  --storm-red: 4 88% 64%;
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
+  * { @apply border-border; }
 
   body {
-    @apply bg-background text-foreground antialiased font-sans transition-colors duration-500 min-h-screen relative overflow-x-hidden;
+    @apply bg-background text-foreground antialiased font-sans min-h-screen overflow-x-hidden;
+    transition: background-color 0.4s ease, color 0.3s ease;
   }
 
   h1, h2, h3, h4, h5, h6, .font-display {
     font-family: var(--font-display);
-    @apply tracking-wider;
   }
 }
 
-@layer utilities {
-  .glass {
-    @apply bg-background/60 backdrop-blur-xl border border-white/10 dark:border-white/5;
-  }
-  
-  .glass-card {
-    @apply bg-card/40 backdrop-blur-md border border-white/20 dark:border-white/10 shadow-xl;
-  }
+/* ─── BACKGROUNDS ─────────────────────────────────────────────── */
 
-  .text-shadow-neon-cyan {
-    text-shadow: 0 0 5px hsl(var(--neon-cyan)), 0 0 10px hsl(var(--neon-cyan) / 0.5);
-  }
-  
-  .text-shadow-neon-red {
-    text-shadow: 0 0 5px hsl(var(--neon-red)), 0 0 10px hsl(var(--neon-red) / 0.5);
-  }
-
-  .glow-cyan {
-    box-shadow: 0 0 15px hsl(var(--neon-cyan) / 0.3), inset 0 0 10px hsl(var(--neon-cyan) / 0.1);
-    border-color: hsl(var(--neon-cyan) / 0.5);
-  }
-
-  .glow-magenta {
-    box-shadow: 0 0 15px hsl(var(--neon-magenta) / 0.3), inset 0 0 10px hsl(var(--neon-magenta) / 0.1);
-    border-color: hsl(var(--neon-magenta) / 0.5);
-  }
-
-  .glow-green {
-    box-shadow: 0 0 15px hsl(var(--neon-green) / 0.3), inset 0 0 10px hsl(var(--neon-green) / 0.1);
-    border-color: hsl(var(--neon-green) / 0.5);
-  }
-
-  .glow-yellow {
-    box-shadow: 0 0 15px hsl(var(--neon-yellow) / 0.3), inset 0 0 10px hsl(var(--neon-yellow) / 0.1);
-    border-color: hsl(var(--neon-yellow) / 0.5);
-  }
-
-  .glow-red {
-    box-shadow: 0 0 15px hsl(var(--neon-red) / 0.4), inset 0 0 10px hsl(var(--neon-red) / 0.2);
-    border-color: hsl(var(--neon-red) / 0.6);
-  }
+body {
+  background-image: 
+    radial-gradient(ellipse 80% 60% at 50% 0%, hsl(var(--primary) / 0.08) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 40% at 80% 90%, hsl(var(--nature-green) / 0.06) 0%, transparent 60%);
 }
+
+.dark body {
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% 0%, hsl(199 89% 60% / 0.10) 0%, transparent 65%),
+    radial-gradient(ellipse 60% 40% at 10% 100%, hsl(145 68% 52% / 0.07) 0%, transparent 60%);
+}
+
+/* ─── GLASS COMPONENTS ────────────────────────────────────────── */
+
+.glass {
+  background: hsl(var(--background) / 0.72);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  border: 1px solid hsl(var(--border) / 0.8);
+}
+
+.glass-card {
+  background: hsl(var(--card) / 0.80);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  border: 1px solid hsl(var(--border) / 0.6);
+  box-shadow: 0 8px 32px hsl(215 42% 5% / 0.12), 0 2px 8px hsl(215 42% 5% / 0.06);
+}
+
+.dark .glass-card {
+  background: hsl(var(--card) / 0.75);
+  border-color: hsl(var(--border) / 0.5);
+  box-shadow: 0 8px 32px hsl(215 42% 3% / 0.4), 0 2px 8px hsl(215 42% 3% / 0.2);
+}
+
+/* ─── STATUS GLOW EFFECTS ─────────────────────────────────────── */
+
+.status-glow-good {
+  box-shadow: 0 4px 20px hsl(var(--nature-green) / 0.25);
+  border-color: hsl(var(--nature-green) / 0.45) !important;
+}
+
+.status-glow-moderate {
+  box-shadow: 0 4px 20px hsl(var(--sun-amber) / 0.25);
+  border-color: hsl(var(--sun-amber) / 0.45) !important;
+}
+
+.status-glow-danger {
+  box-shadow: 0 4px 20px hsl(var(--storm-red) / 0.30);
+  border-color: hsl(var(--storm-red) / 0.50) !important;
+  animation: danger-pulse 2s ease-in-out infinite;
+}
+
+.active-card {
+  box-shadow: 0 0 0 2px hsl(var(--primary) / 0.6), 0 8px 24px hsl(var(--primary) / 0.2);
+}
+
+/* ─── SCORE RING ──────────────────────────────────────────────── */
+
+.score-ring-track {
+  stroke: hsl(var(--border));
+}
+
+.score-ring-fill-good   { stroke: hsl(var(--nature-green)); filter: drop-shadow(0 0 6px hsl(var(--nature-green) / 0.5)); }
+.score-ring-fill-mod    { stroke: hsl(var(--sun-amber));    filter: drop-shadow(0 0 6px hsl(var(--sun-amber) / 0.5)); }
+.score-ring-fill-danger { stroke: hsl(var(--storm-red));    filter: drop-shadow(0 0 6px hsl(var(--storm-red) / 0.5)); }
+
+/* ─── ANIMATIONS ──────────────────────────────────────────────── */
 
 @keyframes pulse-fast {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.8; transform: scale(1.02); }
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.7; }
 }
 
-@keyframes scanline {
-  0% { transform: translateY(-100%); }
-  100% { transform: translateY(100vh); }
+@keyframes danger-pulse {
+  0%, 100% { box-shadow: 0 4px 20px hsl(var(--storm-red) / 0.30); }
+  50%       { box-shadow: 0 4px 28px hsl(var(--storm-red) / 0.55); }
 }
 
-/* Cyberpunk Background Grid */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image: 
-    linear-gradient(to right, hsl(var(--primary) / 0.05) 1px, transparent 1px),
-    linear-gradient(to bottom, hsl(var(--primary) / 0.05) 1px, transparent 1px);
-  background-size: 50px 50px;
-  pointer-events: none;
-  z-index: -2;
-  mask-image: radial-gradient(circle at center, black, transparent 80%);
-  -webkit-mask-image: radial-gradient(circle at center, black, transparent 80%);
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-8px); }
 }
 
-.scanline {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 200px;
-  background: linear-gradient(to bottom, transparent, hsl(var(--primary) / 0.1), transparent);
-  animation: scanline 8s linear infinite;
-  pointer-events: none;
-  z-index: 50;
-  opacity: 0.5;
+/* ─── CHART TOOLTIP ───────────────────────────────────────────── */
+
+.recharts-tooltip-wrapper .recharts-default-tooltip {
+  border-radius: 12px !important;
 }
+
+/* ─── SCROLLBAR ───────────────────────────────────────────────── */
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.5); }
