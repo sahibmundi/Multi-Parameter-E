@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "f_S5VROKpXBXxfVjRb_Vc"
+uri = "file://artifacts/envmonitor-mobile/assets/images/icon.png"
+type = "image"
+title = "envmonitor cyberpunk icon"

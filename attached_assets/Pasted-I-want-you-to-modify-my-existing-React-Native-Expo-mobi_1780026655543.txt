@@ -1,0 +1,178 @@
+I want you to modify my existing React Native / Expo mobile application with the following requirements. Analyze the current codebase first and then implement the changes carefully without breaking any existing functionality.
+
+## 1. Permanent ThingSpeak Channel Configuration
+
+Currently, the application asks for ThingSpeak Channel IDs every time the app restarts.
+
+Replace this behavior with permanent default channels:
+
+Primary Channel ID: 3307420
+Secondary Channel ID: 3307422
+
+Requirements:
+
+* Store these channel IDs as application defaults.
+* Automatically load data from both channels when the app starts.
+* Do not ask the user to enter these IDs on every restart.
+* If a settings page exists, keep the IDs editable but pre-filled with these values.
+* Use local storage (AsyncStorage) to preserve any future changes.
+
+---
+
+## 2. Convert the Application into a Proper Expo Go Compatible App
+
+The application should run smoothly inside Expo Go.
+
+Tasks:
+
+* Remove any dependencies that are not supported by Expo Go.
+* Fix all Expo compatibility issues.
+* Ensure the app starts correctly using:
+  npm install
+  npx expo start
+* Verify Android preview works in Expo Go.
+* Fix any navigation, asset loading, permissions, or runtime errors preventing Expo preview.
+* Ensure OTA updates and Expo development workflow function correctly.
+
+---
+
+## 3. Real-Time Health Risk & Allergy Analysis Module
+
+Create a new section named:
+
+"Health Alerts & Environmental Warnings"
+
+This section must use REAL sensor readings received from the ThingSpeak channels and should NOT generate fake or random warnings.
+
+The analysis must be based on actual environmental conditions from the collected sensors.
+
+Potential sensor sources include:
+
+* PM2.5
+* PM10
+* Dust Concentration
+* Air Quality Index
+* Gas Levels
+* Temperature
+* Humidity
+* Smoke
+* CO₂
+* VOCs
+* Other environmental sensors already available in the project
+
+Requirements:
+
+### Allergy Risk Detection
+
+Display warnings only when thresholds are exceeded.
+
+Examples:
+
+* High pollen-related respiratory irritation risk
+* Dust allergy warning
+* Asthma trigger warning
+* Air pollution exposure warning
+* Sensitive respiratory condition warning
+* Eye irritation warning
+* Skin irritation risk
+* COPD risk advisory
+
+### Disease and Health Impact Information
+
+Based on actual readings, display possible health effects such as:
+
+* Asthma aggravation
+* Bronchitis risk
+* Respiratory discomfort
+* Allergic rhinitis risk
+* Headache and dizziness risk
+* Reduced air quality impact
+
+### Alert Levels
+
+Use:
+
+* Safe
+* Moderate
+* Unhealthy
+* Severe
+
+Display:
+
+* Status color
+* Explanation
+* Recommended precautions
+
+Example:
+Status: Unhealthy
+Reason: PM2.5 concentration exceeds WHO recommended limits.
+Recommendation: Wear an N95 mask and reduce outdoor exposure.
+
+Important:
+
+* Do not display warnings if readings are within safe limits.
+* All warnings must be generated dynamically from live sensor values.
+* Use scientifically reasonable thresholds based on WHO/air quality guidelines wherever possible.
+
+---
+
+## 4. Improve Multilingual Voice Assistant
+
+The Punjabi voice assistant currently has poor pronunciation and unclear speech.
+
+Improve the multilingual voice system.
+
+Requirements:
+
+### Punjabi Language Improvements
+
+* Use high-quality Punjabi (pa-IN) speech synthesis.
+* Improve pronunciation quality.
+* Prefer native Punjabi voices if available on the device.
+* Add automatic fallback to the best available voice.
+
+### Voice Features
+
+Support:
+
+* English
+* Punjabi
+* Hindi
+
+Voice assistant should:
+
+* Speak sensor readings.
+* Read health alerts.
+* Read environmental warnings.
+* Announce severe conditions automatically.
+
+Provide language selection inside settings.
+
+---
+
+## 5. Health Alert Dashboard UI
+
+Create a modern dashboard section containing:
+
+* Air Quality Status
+* Allergy Risk Level
+* Disease Risk Advisory
+* Environmental Safety Score
+* Live Recommendations
+* Voice Announcement Button
+
+Use professional cards, icons, color coding, and mobile-friendly responsive design.
+
+---
+
+## 6. Code Quality Requirements
+
+* Maintain existing functionality.
+* Keep all charts and ThingSpeak visualizations working.
+* Follow clean React Native and Expo best practices.
+* Add comments where necessary.
+* Optimize API calls.
+* Handle network failures gracefully.
+* Ensure production-ready code quality.
+
+Before implementing changes, analyze the existing project structure and identify the files that need modification. Then perform all changes systematically and provide a summary of every file that was updated.
