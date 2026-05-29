@@ -38,7 +38,7 @@ export function useIntelligence(
       smoke: unified.smoke, nh3: unified.nh3, benzene: unified.benzene,
       lpg: unified.lpg, temperature: unified.temperature,
       humidity: unified.humidity, rain: unified.rain,
-      pollenActivityScore: pollen.outdoorSafetyScore,
+      pollenScore: pollen.outdoorSafetyScore,
     });
 
     const healthRisks = calculateHealthRisks({
@@ -56,11 +56,20 @@ export function useIntelligence(
       rain: unified.rain, aqiScore: aqi.score,
     });
 
+    // Explicit key map avoids unsafe cast — SENSOR_BOUNDS keys match UnifiedReading field names
+    const unifiedValueMap: Record<keyof typeof SENSOR_BOUNDS, number | null> = {
+      co2: unified.co2, smoke: unified.smoke, nh3: unified.nh3,
+      benzene: unified.benzene, lpg: unified.lpg, dust: unified.dust,
+      rain: unified.rain, pressure: unified.pressure,
+      temperature: unified.temperature, humidity: unified.humidity,
+      altitude: unified.altitude, pms1: unified.pms1, pms25: unified.pms25, pms10: unified.pms10,
+    };
+
     const reliabilityInputs = Object.entries(SENSOR_BOUNDS).map(([id, bounds]) => ({
       id,
       name: bounds.name,
       unit: '',
-      currentValue: (unified as Record<string, number | null | undefined>)[id],
+      currentValue: unifiedValueMap[id as keyof typeof SENSOR_BOUNDS],
       history: historical[id] ?? [],
       physicalMin: bounds.min,
       physicalMax: bounds.max,

@@ -5,6 +5,16 @@ import type { Lang } from '@/constants/translations';
 
 const DEFAULT_CH1 = '3307420';
 const DEFAULT_CH2 = '3307422';
+const MAX_HISTORY = 10;
+
+/** Per-sensor rolling history entry */
+export interface HistoryPoint {
+  value: number;
+  timestamp: string;
+}
+
+/** Rolling history keyed by SensorReadings field name */
+export type SensorHistory = Record<string, HistoryPoint[]>;
 
 interface AppContextType {
   lang: Lang;
@@ -13,6 +23,7 @@ interface AppContextType {
   ch2Id: string;
   saveChannels: (c1: string, c2: string) => Promise<void>;
   readings: SensorReadings | null;
+  sensorHistory: SensorHistory;
   isLoading: boolean;
   isConnected: boolean;
   error: string | null;
@@ -27,11 +38,33 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | null>(null);
 
+/** Sensor keys to track in rolling history (matches SENSOR_BOUNDS in sensor-reliability engine) */
+const HISTORY_KEYS: Array<keyof SensorReadings> = [
+  'CO2', 'Smoke', 'NH3', 'Benzene', 'LPG', 'Dust', 'Rain', 'Pressure',
+  'Temperature', 'Humidity', 'Altitude', 'PMS1', 'PMS25', 'PMS10',
+];
+
+function appendHistory(prev: SensorHistory, readings: SensorReadings): SensorHistory {
+  const ts = readings.timestamp ? readings.timestamp.toISOString() : new Date().toISOString();
+  const next: SensorHistory = { ...prev };
+  for (const key of HISTORY_KEYS) {
+    const val = readings[key];
+    if (typeof val === 'number' && !isNaN(val)) {
+      const arr = prev[key] ?? [];
+      next[key] = [...arr.slice(-(MAX_HISTORY - 1)), { value: val, timestamp: ts }];
+    } else {
+      next[key] = prev[key] ?? [];
+    }
+  }
+  return next;
+}
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [lang, setLangState] = useState<Lang>('en');
   const [ch1Id, setCh1Id] = useState(DEFAULT_CH1);
   const [ch2Id, setCh2Id] = useState(DEFAULT_CH2);
   const [readings, setReadings] = useState<SensorReadings | null>(null);
+  const [sensorHistory, setSensorHistory] = useState<SensorHistory>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,6 +85,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const data = await fetchAllReadings(ch1Ref.current, ch2Ref.current);
       setReadings(data);
+      setSensorHistory(prev => appendHistory(prev, data));
       setIsConnected(true);
       setLastUpdated(new Date());
     } catch (e) {
@@ -113,6 +147,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setCh2Id(t2);
     ch1Ref.current = t1;
     ch2Ref.current = t2;
+    setSensorHistory({});  // reset history when channels change
     await AsyncStorage.multiSet([['ch1Id', t1], ['ch2Id', t2]]);
     await fetchData();
     if (autoRefresh) startTimer();
@@ -134,7 +169,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     <AppContext.Provider value={{
       lang, setLang,
       ch1Id, ch2Id, saveChannels,
-      readings, isLoading, isConnected, error, lastUpdated,
+      readings, sensorHistory, isLoading, isConnected, error, lastUpdated,
       refresh: fetchData,
       autoRefresh, setAutoRefresh,
       voiceQuery, voiceResponse, setVoiceResult,

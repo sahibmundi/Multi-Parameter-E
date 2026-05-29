@@ -5,6 +5,7 @@ import { calculateSafetyScore, type SafetyScoreResult } from './safety-score';
 import { assessSensorReliability, SENSOR_BOUNDS, type ReliabilityResult } from './sensor-reliability';
 import { calculateInfectionsAllergies, type InfectionRisk } from './infections-allergies';
 import type { SensorReadings } from '@/services/thingspeak';
+import type { SensorHistory } from '@/context/AppContext';
 
 export interface IntelligenceData {
   aqi: AQIResult;
@@ -16,14 +17,32 @@ export interface IntelligenceData {
   overallRiskLevel: 'Low' | 'Moderate' | 'High' | 'Critical';
 }
 
-export function computeIntelligence(readings: SensorReadings | null): IntelligenceData {
+/**
+ * Build the flat readings map expected by assessSensorReliability.
+ * Keys match SENSOR_BOUNDS (PascalCase on mobile).
+ */
+function buildReadingsMap(readings: SensorReadings): Record<string, number | null> {
+  return {
+    CO2: readings.CO2, Smoke: readings.Smoke, NH3: readings.NH3,
+    Benzene: readings.Benzene, LPG: readings.LPG, Dust: readings.Dust,
+    Rain: readings.Rain, Pressure: readings.Pressure,
+    Temperature: readings.Temperature, Humidity: readings.Humidity,
+    Altitude: readings.Altitude, PMS1: readings.PMS1,
+    PMS25: readings.PMS25, PMS10: readings.PMS10,
+  };
+}
+
+export function computeIntelligence(
+  readings: SensorReadings | null,
+  history: SensorHistory = {},
+): IntelligenceData {
   if (!readings) {
-    const aqi        = calculateAQI({});
-    const pollen     = calculatePollen({});
-    const safetyScore = calculateSafetyScore({});
-    const healthRisks = calculateHealthRisks({ aqiScore: 0 });
+    const aqi             = calculateAQI({});
+    const pollen          = calculatePollen({});
+    const safetyScore     = calculateSafetyScore({});
+    const healthRisks     = calculateHealthRisks({ aqiScore: 0 });
     const infectionsAllergies = calculateInfectionsAllergies({});
-    const reliability = assessSensorReliability({}, {});
+    const reliability     = assessSensorReliability({}, {});
     return { aqi, healthRisks, pollen, safetyScore, reliability, infectionsAllergies, overallRiskLevel: 'Low' };
   }
 
@@ -56,19 +75,14 @@ export function computeIntelligence(readings: SensorReadings | null): Intelligen
   const infectionsAllergies = calculateInfectionsAllergies({
     pms1: readings.PMS1, pms25: readings.PMS25, pms10: readings.PMS10,
     dust: readings.Dust, smoke: readings.Smoke, co2: readings.CO2,
-    nh3: readings.NH3, benzene: readings.Benzene, temperature: readings.Temperature,
-    humidity: readings.Humidity, rain: readings.Rain, aqiScore: aqi.score,
+    nh3: readings.NH3, benzene: readings.Benzene,
+    temperature: readings.Temperature, humidity: readings.Humidity,
+    rain: readings.Rain, aqiScore: aqi.score,
   });
 
-  // Build flat readings map for reliability assessment
-  const readingsMap: Record<string, number | null> = {
-    CO2: readings.CO2, Smoke: readings.Smoke, NH3: readings.NH3,
-    Benzene: readings.Benzene, LPG: readings.LPG, Dust: readings.Dust,
-    Rain: readings.Rain, Pressure: readings.Pressure,
-    Temperature: readings.Temperature, Humidity: readings.Humidity, Altitude: readings.Altitude,
-    PMS1: readings.PMS1, PMS25: readings.PMS25, PMS10: readings.PMS10,
-  };
-  const reliability = assessSensorReliability(readingsMap, {});
+  // Build flat readings map and pass rolling history for full frozen/spike detection
+  const readingsMap = buildReadingsMap(readings);
+  const reliability = assessSensorReliability(readingsMap, history);
 
   const criticalCount = healthRisks.filter(r => r.riskLevel === 'Critical').length;
   const highCount     = healthRisks.filter(r => r.riskLevel === 'High').length;

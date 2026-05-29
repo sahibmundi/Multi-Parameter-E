@@ -113,7 +113,7 @@ type TabId = 'infections' | 'health' | 'pollen' | 'sensors' | 'classic';
 
 export default function HealthScreen() {
   const insets = useSafeAreaInsets();
-  const { readings, isLoading, refresh, lang } = useApp();
+  const { readings, sensorHistory, isLoading, refresh, lang } = useApp();
   const [activeTab, setActiveTab] = useState<TabId>('infections');
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const botPad = Platform.OS === 'web' ? 34 : insets.bottom;
@@ -127,7 +127,7 @@ export default function HealthScreen() {
 
   const score      = getOverallScore(numericReadings);
   const conditions = generateHealthConditions(numericReadings);
-  const intel      = computeIntelligence(readings);
+  const intel      = computeIntelligence(readings, sensorHistory);
 
   const severeCount    = conditions.filter(c => c.level === 'severe').length;
   const unhealthyCount = conditions.filter(c => c.level === 'unhealthy').length;
