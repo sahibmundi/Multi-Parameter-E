@@ -81,31 +81,43 @@ export interface AQIInput {
   nh3?: number | null;
   benzene?: number | null;
   lpg?: number | null;
+  /** PMS7003 PM2.5 — preferred over optical dust when available */
+  pms25?: number | null;
+  /** PMS7003 PM10 */
+  pms10?: number | null;
 }
 
 export function calculateAQI(input: AQIInput): AQIResult {
-  const pm25Aqi  = input.dust    != null ? pm25ToAQI(input.dust)         : 0;
-  const co2Aqi   = input.co2     != null ? co2ToSubIndex(input.co2)      : 0;
-  const smokeAqi = input.smoke   != null ? smokeToSubIndex(input.smoke)  : 0;
+  // Prefer PMS7003 PM2.5 over optical dust sensor for AQI calculation
+  const pm25Source = input.pms25 ?? input.dust;
+  const pm10Source = input.pms10;
+
+  const pm25Aqi  = pm25Source != null ? pm25ToAQI(pm25Source) : 0;
+  const pm10Aqi  = pm10Source != null ? Math.round(pm10Source > 50 ? linearScale(pm10Source, 50, 300, 100, 300) : pm10Source > 25 ? linearScale(pm10Source, 25, 50, 50, 100) : linearScale(pm10Source, 0, 25, 0, 50)) : 0;
+  const co2Aqi   = input.co2   != null ? co2ToSubIndex(input.co2)     : 0;
+  const smokeAqi = input.smoke != null ? smokeToSubIndex(input.smoke) : 0;
   const gasAqi   = gasToSubIndex(input.nh3 ?? 0, input.benzene ?? 0, input.lpg ?? 0);
 
+  const particleAqi = Math.max(pm25Aqi, pm10Aqi);
+
   const components = [
-    { name: 'PM2.5 (Dust)', val: pm25Aqi },
-    { name: 'CO₂',          val: co2Aqi  },
-    { name: 'Smoke',        val: smokeAqi },
-    { name: 'Gas',          val: gasAqi  },
+    { name: 'PM2.5',  val: pm25Aqi    },
+    { name: 'PM10',   val: pm10Aqi    },
+    { name: 'CO₂',    val: co2Aqi     },
+    { name: 'Smoke',  val: smokeAqi   },
+    { name: 'Gas',    val: gasAqi     },
   ];
 
   const dominant = components.reduce((a, b) => a.val > b.val ? a : b);
   const score = Math.min(500, Math.max(0, Math.round(
-    pm25Aqi * 0.50 + smokeAqi * 0.20 + co2Aqi * 0.15 + gasAqi * 0.15
+    particleAqi * 0.50 + smokeAqi * 0.20 + co2Aqi * 0.15 + gasAqi * 0.15
   )));
 
   return {
     score,
-    category:         aqiToCategory(score),
-    color:            aqiColor(score),
-    dominantPollutant: dominant.name,
-    severity:         aqiSeverity(score),
+    category:          aqiToCategory(score),
+    color:             aqiColor(score),
+    dominantPollutant: dominant.val > 0 ? dominant.name : 'None',
+    severity:          aqiSeverity(score),
   };
 }

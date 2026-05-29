@@ -6,12 +6,14 @@ interface SensorStatusPanelProps {
   reliability: ReliabilityResult;
 }
 
-const STATUS_ICONS: Record<SensorStatus, React.ComponentType<{ className?: string }>> = {
-  Online:  CheckCircle,
-  Offline: WifiOff,
-  Frozen:  Pause,
-  Spike:   Zap,
-  Invalid: AlertTriangle,
+type IconComponent = React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
+
+const STATUS_ICONS: Record<SensorStatus, IconComponent> = {
+  Online:  CheckCircle  as IconComponent,
+  Offline: WifiOff      as IconComponent,
+  Frozen:  Pause        as IconComponent,
+  Spike:   Zap          as IconComponent,
+  Invalid: AlertTriangle as IconComponent,
 };
 
 export function SensorStatusPanel({ reliability }: SensorStatusPanelProps) {
@@ -22,13 +24,13 @@ export function SensorStatusPanel({ reliability }: SensorStatusPanelProps) {
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: 0.2 }}
-      className="glass-card rounded-2xl p-5 flex flex-col gap-4"
+      className="flex flex-col gap-4"
     >
       <div className="flex items-center justify-between">
         <h3 className="font-display font-bold text-foreground text-base">Sensor Reliability</h3>
         {allHealthy ? (
           <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-500 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1 rounded-full">
-            <CheckCircle className="w-3 h-3" />All Online
+            <CheckCircle className="w-3 h-3" /> All Online
           </span>
         ) : (
           <span className="flex items-center gap-1.5 text-xs font-bold text-amber-500 bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 rounded-full">
@@ -40,7 +42,11 @@ export function SensorStatusPanel({ reliability }: SensorStatusPanelProps) {
 
       {!allHealthy && (
         <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-600 dark:text-amber-400">
-          Maintenance alert: {offlineCount > 0 ? `${offlineCount} sensor(s) offline or invalid.` : `${degradedCount} sensor(s) showing abnormal readings.`} Check hardware connections.
+          Maintenance alert:{' '}
+          {offlineCount > 0
+            ? `${offlineCount} sensor(s) offline or invalid.`
+            : `${degradedCount} sensor(s) showing abnormal readings.`}{' '}
+          Check hardware connections.
         </div>
       )}
 

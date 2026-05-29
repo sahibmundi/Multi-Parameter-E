@@ -1,27 +1,11 @@
 import { useMemo } from 'react';
-import { calculateAQI, type AQIResult, type AQIInput } from '@/lib/engines/aqi';
-import { calculateHealthRisks, type HealthRisk, type HealthRiskInput } from '@/lib/engines/health-risk';
-import { calculatePollen, type PollenResult, type PollenInput } from '@/lib/engines/pollen';
-import { calculateSafetyScore, type SafetyScoreResult, type SafetyScoreInput } from '@/lib/engines/safety-score';
-import { assessSensorReliability, SENSOR_BOUNDS, type ReliabilityResult, type ReliabilityInput } from '@/lib/engines/sensor-reliability';
-
-interface SensorValues {
-  co2?: number | null;
-  smoke?: number | null;
-  nh3?: number | null;
-  benzene?: number | null;
-  lpg?: number | null;
-  dust?: number | null;
-  rain?: number | null;
-  pressure?: number | null;
-  temperature?: number | null;
-  humidity?: number | null;
-  altitude?: number | null;
-}
-
-interface HistoricalValues {
-  [sensorId: string]: { value: number; timestamp: string }[];
-}
+import { calculateAQI, type AQIResult } from '@/lib/engines/aqi';
+import { calculateHealthRisks, type HealthRisk } from '@/lib/engines/health-risk';
+import { calculatePollen, type PollenResult } from '@/lib/engines/pollen';
+import { calculateSafetyScore, type SafetyScoreResult } from '@/lib/engines/safety-score';
+import { assessSensorReliability, SENSOR_BOUNDS, type ReliabilityResult } from '@/lib/engines/sensor-reliability';
+import { calculateInfectionsAllergies, type InfectionAllergyRisk } from '@/lib/engines/infections-allergies';
+import type { UnifiedReading } from '@/lib/processing/unified-readings';
 
 export interface IntelligenceData {
   aqi: AQIResult;
@@ -29,68 +13,75 @@ export interface IntelligenceData {
   pollen: PollenResult;
   safetyScore: SafetyScoreResult;
   reliability: ReliabilityResult;
+  infectionsAllergies: InfectionAllergyRisk[];
   overallRiskLevel: 'Low' | 'Moderate' | 'High' | 'Critical';
 }
 
 export function useIntelligence(
-  latest: SensorValues,
-  historical: HistoricalValues,
+  unified: UnifiedReading,
+  historical: Record<string, { value: number; timestamp: string }[]>,
 ): IntelligenceData {
   return useMemo(() => {
-    const aqiInput: AQIInput = {
-      dust: latest.dust, co2: latest.co2,
-      smoke: latest.smoke, nh3: latest.nh3,
-      benzene: latest.benzene, lpg: latest.lpg,
-    };
-    const aqi = calculateAQI(aqiInput);
+    const aqi = calculateAQI({
+      dust: unified.dust, co2: unified.co2, smoke: unified.smoke,
+      nh3: unified.nh3, benzene: unified.benzene, lpg: unified.lpg,
+      pms25: unified.pms25, pms10: unified.pms10,
+    });
 
-    const pollenInput: PollenInput = {
-      temperature: latest.temperature, humidity: latest.humidity,
-      rain: latest.rain, dust: latest.dust, pressure: latest.pressure,
-    };
-    const pollen = calculatePollen(pollenInput);
+    const pollen = calculatePollen({
+      temperature: unified.temperature, humidity: unified.humidity,
+      rain: unified.rain, dust: unified.dust, pressure: unified.pressure,
+    });
 
-    const safetyInput: SafetyScoreInput = {
-      aqiScore: aqi.score, dust: latest.dust, co2: latest.co2,
-      smoke: latest.smoke, nh3: latest.nh3, benzene: latest.benzene,
-      lpg: latest.lpg, temperature: latest.temperature,
-      humidity: latest.humidity, rain: latest.rain,
-      pollenScore: 100 - pollen.outdoorSafetyScore,
-    };
-    const safetyScore = calculateSafetyScore(safetyInput);
+    const safetyScore = calculateSafetyScore({
+      aqiScore: aqi.score, dust: unified.dust, co2: unified.co2,
+      smoke: unified.smoke, nh3: unified.nh3, benzene: unified.benzene,
+      lpg: unified.lpg, temperature: unified.temperature,
+      humidity: unified.humidity, rain: unified.rain,
+      pollenActivityScore: pollen.outdoorSafetyScore,
+    });
 
-    const healthInput: HealthRiskInput = {
-      dust: latest.dust, smoke: latest.smoke, co2: latest.co2,
-      nh3: latest.nh3, benzene: latest.benzene, lpg: latest.lpg,
-      temperature: latest.temperature, humidity: latest.humidity,
-      pressure: latest.pressure, rain: latest.rain,
+    const healthRisks = calculateHealthRisks({
+      dust: unified.dust, smoke: unified.smoke, co2: unified.co2,
+      nh3: unified.nh3, benzene: unified.benzene, lpg: unified.lpg,
+      temperature: unified.temperature, humidity: unified.humidity,
       aqiScore: aqi.score,
-    };
-    const healthRisks = calculateHealthRisks(healthInput);
+    });
 
-    const reliabilityInputs: ReliabilityInput[] = Object.entries(SENSOR_BOUNDS).map(([id, bounds]) => ({
+    const infectionsAllergies = calculateInfectionsAllergies({
+      pms1: unified.pms1, pms25: unified.pms25, pms10: unified.pms10,
+      dust: unified.dust, smoke: unified.smoke, co2: unified.co2,
+      nh3: unified.nh3, benzene: unified.benzene, lpg: unified.lpg,
+      temperature: unified.temperature, humidity: unified.humidity,
+      rain: unified.rain, aqiScore: aqi.score,
+    });
+
+    const reliabilityInputs = Object.entries(SENSOR_BOUNDS).map(([id, bounds]) => ({
       id,
       name: bounds.name,
       unit: '',
-      currentValue: (latest as Record<string, number | null | undefined>)[id],
+      currentValue: (unified as Record<string, number | null | undefined>)[id],
       history: historical[id] ?? [],
       physicalMin: bounds.min,
       physicalMax: bounds.max,
     }));
     const reliability = assessSensorReliability(reliabilityInputs);
 
-    // Derive overall risk level from health risks
     const criticalCount = healthRisks.filter(r => r.riskLevel === 'Critical').length;
     const highCount     = healthRisks.filter(r => r.riskLevel === 'High').length;
-    let overallRiskLevel: IntelligenceData['overallRiskLevel'] = 'Low';
-    if (criticalCount > 0)       overallRiskLevel = 'Critical';
-    else if (highCount > 1)      overallRiskLevel = 'High';
-    else if (highCount > 0)      overallRiskLevel = 'Moderate';
+    const critInfect    = infectionsAllergies.filter(r => r.riskLevel === 'Critical').length;
+    const highInfect    = infectionsAllergies.filter(r => r.riskLevel === 'High').length;
 
-    return { aqi, healthRisks, pollen, safetyScore, reliability, overallRiskLevel };
+    let overallRiskLevel: IntelligenceData['overallRiskLevel'] = 'Low';
+    if (criticalCount > 0 || critInfect > 0)   overallRiskLevel = 'Critical';
+    else if (highCount > 1 || highInfect > 1)   overallRiskLevel = 'High';
+    else if (highCount > 0 || highInfect > 0)   overallRiskLevel = 'Moderate';
+
+    return { aqi, healthRisks, pollen, safetyScore, reliability, infectionsAllergies, overallRiskLevel };
   }, [
-    latest.co2, latest.smoke, latest.nh3, latest.benzene, latest.lpg,
-    latest.dust, latest.rain, latest.pressure, latest.temperature,
-    latest.humidity, latest.altitude, historical,
+    unified.co2, unified.smoke, unified.nh3, unified.benzene, unified.lpg,
+    unified.dust, unified.rain, unified.pressure, unified.temperature,
+    unified.humidity, unified.altitude, unified.pms1, unified.pms25, unified.pms10,
+    historical,
   ]);
 }

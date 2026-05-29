@@ -10,13 +10,14 @@ import { SafetyScoreWidget } from "@/components/safety-score-widget";
 import { HealthRiskPanel } from "@/components/health-risk-panel";
 import { PollenPanel } from "@/components/pollen-panel";
 import { SensorStatusPanel } from "@/components/sensor-status-panel";
+import { InfectionsAllergiesPanel } from "@/components/infections-allergies-panel";
 import { useTranslation } from "@/lib/i18n";
 import { useAppStore } from "@/lib/store";
 import { format } from "date-fns";
 import {
   AlertTriangle, Download, RefreshCw, Settings, X,
   CheckCircle, Thermometer, Droplets, Gauge,
-  Shield, Brain, Flower2, Activity,
+  Shield, Brain, Flower2, Activity, Wind, Biohazard,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { exportToCSV } from "@/lib/utils";
@@ -28,37 +29,23 @@ const SCORE_COLOR = (s: number) =>
   s >= 60 ? { ring: 'score-ring-fill-mod',    text: 'text-amber-500   dark:text-amber-400',    bg: 'bg-amber-500/10'   } :
              { ring: 'score-ring-fill-danger', text: 'text-rose-500    dark:text-rose-400',     bg: 'bg-rose-500/10'    };
 
-type IntelTab = 'aqi' | 'safety' | 'health' | 'pollen' | 'sensors';
+type IntelTab = 'aqi' | 'safety' | 'health' | 'pollen' | 'infections' | 'sensors';
 
-const INTEL_TABS: { id: IntelTab; label: string; icon: React.ComponentType<{className?: string}> }[] = [
-  { id: 'aqi',     label: 'AQI',           icon: Activity   },
-  { id: 'safety',  label: 'Safety Score',  icon: Shield     },
-  { id: 'health',  label: 'Health Risks',  icon: Brain      },
-  { id: 'pollen',  label: 'Pollen',        icon: Flower2    },
-  { id: 'sensors', label: 'Sensor Status', icon: CheckCircle },
+const INTEL_TABS: { id: IntelTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { id: 'aqi',        label: 'AQI',                icon: Activity   },
+  { id: 'safety',     label: 'Safety Score',       icon: Shield     },
+  { id: 'health',     label: 'Health Risks',       icon: Brain      },
+  { id: 'infections', label: 'Infections & Allergies', icon: Biohazard },
+  { id: 'pollen',     label: 'Pollen',             icon: Flower2    },
+  { id: 'sensors',    label: 'Sensor Status',      icon: CheckCircle },
 ];
 
 export default function Dashboard() {
   const { language } = useAppStore();
   const t = useTranslation(language);
-  const { latestData, historicalData, score, dangerousCount, lastUpdated, isLoading, isError, raw } = useSensorData(100);
+  const { latestData, historicalData, unified, score, dangerousCount, lastUpdated, isLoading, isError, raw } = useSensorData(100);
 
-  // Build typed sensor values for intelligence engines
-  const sensorValues = {
-    co2:         latestData['co2']?.value,
-    smoke:       latestData['smoke']?.value,
-    nh3:         latestData['nh3']?.value,
-    benzene:     latestData['benzene']?.value,
-    lpg:         latestData['lpg']?.value,
-    dust:        latestData['dust']?.value,
-    rain:        latestData['rain']?.value,
-    pressure:    latestData['pressure']?.value,
-    temperature: latestData['temperature']?.value,
-    humidity:    latestData['humidity']?.value,
-    altitude:    latestData['altitude']?.value,
-  };
-
-  const intel = useIntelligence(sensorValues, historicalData);
+  const intel = useIntelligence(unified, historicalData);
 
   const [selectedParamId, setSelectedParamId] = useState<string>(PARAMETERS[0].id);
   const [showConfig, setShowConfig] = useState(false);
@@ -79,15 +66,18 @@ export default function Dashboard() {
 
   const handleDownloadAll = () => {
     if (!raw.ch1 || !raw.ch2) return;
-    const merged = raw.ch1.map((f1: any, i: number) => {
+    const merged = raw.ch1.map((f1: Record<string, unknown>, i: number) => {
       const f2 = raw.ch2?.[i] || {};
-      return { ...f1, ...f2, timestamp: f1.created_at || f2.created_at };
+      return { ...f1, ...f2, timestamp: f1.created_at || (f2 as Record<string, unknown>).created_at };
     });
     exportToCSV(merged, 'env_monitor_full_export');
   };
 
   const dangerParams   = PARAMETERS.filter(p => latestData[p.id]?.status === 'DANGEROUS');
   const moderateParams = PARAMETERS.filter(p => latestData[p.id]?.status === 'MODERATE');
+
+  const criticalInfections = intel.infectionsAllergies.filter(r => r.riskLevel === 'Critical');
+  const highInfections     = intel.infectionsAllergies.filter(r => r.riskLevel === 'High');
 
   return (
     <Layout>
@@ -132,12 +122,12 @@ export default function Dashboard() {
                 </button>
               </div>
               <p className="text-sm text-muted-foreground mb-5 leading-relaxed">
-                Channels <span className="font-mono text-foreground">3307420</span> and <span className="font-mono text-foreground">3307422</span> are pre-configured. Update below to connect different sensors.
+                Channel <span className="font-mono text-foreground">3307420</span> (Gas) and <span className="font-mono text-foreground">3307422</span> (Climate + PMS7003) are pre-configured.
               </p>
               <div className="space-y-4">
                 {[
                   { label: 'Channel 1 ID', hint: 'CO₂, Smoke, NH₃, Benzene, LPG, Dust, Rain, Pressure', val: ch1Id, set: setCh1Id },
-                  { label: 'Channel 2 ID', hint: 'Temperature, Humidity, Altitude', val: ch2Id, set: setCh2Id },
+                  { label: 'Channel 2 ID', hint: 'Temp, Humidity, Altitude + PM1.0, PM2.5, PM10', val: ch2Id, set: setCh2Id },
                 ].map(({ label, hint, val, set }) => (
                   <div key={label}>
                     <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-1.5">
@@ -227,6 +217,19 @@ export default function Dashboard() {
               </div>
             ) : (
               <div className="flex-1 flex flex-col gap-3">
+                {/* Infection banner */}
+                {(criticalInfections.length > 0 || highInfections.length > 0) && (
+                  <div className="flex items-start gap-2 p-2.5 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-600 dark:text-rose-400 font-semibold">
+                    <Biohazard className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                    <span>
+                      {criticalInfections.length > 0
+                        ? `${criticalInfections.length} critical infection/allergy risk${criticalInfections.length > 1 ? 's' : ''} detected`
+                        : `${highInfections.length} high infection/allergy risk${highInfections.length > 1 ? 's' : ''} elevated`}
+                      — see Infections & Allergies tab
+                    </span>
+                  </div>
+                )}
+
                 <p className={`text-sm leading-relaxed border-l-2 pl-3 py-0.5 ${
                   dangerousCount > 0 ? 'border-rose-500 text-rose-600 dark:text-rose-400' :
                   moderateParams.length > 0 ? 'border-amber-500 text-amber-600 dark:text-amber-400' :
@@ -270,7 +273,6 @@ export default function Dashboard() {
                       </div>
                     );
                   })}
-                  {/* AQI quick badge */}
                   <div className="flex items-center gap-2 rounded-xl px-3 py-2" style={{ backgroundColor: intel.aqi.color + '18', border: `1px solid ${intel.aqi.color}33` }}>
                     <Activity className="w-3.5 h-3.5 shrink-0" style={{ color: intel.aqi.color }} />
                     <div>
@@ -284,6 +286,52 @@ export default function Dashboard() {
           </motion.div>
         </div>
 
+        {/* ── PMS7003 Particulate Panel ──────────────────────────── */}
+        {!isLoading && !isError && (unified.pms1 !== null || unified.pms25 !== null || unified.pms10 !== null) && (
+          <div className="glass-card rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Wind className="w-4 h-4 text-primary" />
+              <h2 className="font-display font-bold text-base text-foreground">PMS7003 Particulate Sensor</h2>
+              <span className="text-xs text-muted-foreground font-medium bg-secondary px-2 py-0.5 rounded-full">Channel 2 · Fields 4–6</span>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: 'PM1.0', value: unified.pms1,  unit: 'μg/m³', desc: 'Ultra-fine particles ≤1.0μm', threshold: { warn: 15, danger: 35 } },
+                { label: 'PM2.5', value: unified.pms25, unit: 'μg/m³', desc: 'Fine particles ≤2.5μm (WHO: 15μg/m³)', threshold: { warn: 15, danger: 55 } },
+                { label: 'PM10',  value: unified.pms10, unit: 'μg/m³', desc: 'Coarse particles ≤10μm (WHO: 45μg/m³)', threshold: { warn: 45, danger: 150 } },
+              ].map(({ label, value, unit, desc, threshold }) => {
+                const status: StatusLevel = value === null ? 'GOOD'
+                  : value > threshold.danger ? 'DANGEROUS'
+                  : value > threshold.warn   ? 'MODERATE'
+                  : 'GOOD';
+                const color = status === 'DANGEROUS' ? '#ef4444' : status === 'MODERATE' ? '#eab308' : '#22c55e';
+                const maxVal = threshold.danger * 2;
+                const pct = value !== null ? Math.min(100, (value / maxVal) * 100) : 0;
+
+                return (
+                  <div key={label} className="relative rounded-xl p-4 bg-secondary/40 border border-border/50 overflow-hidden">
+                    <div className="absolute bottom-0 left-0 h-1 w-full bg-secondary" />
+                    <div className="absolute bottom-0 left-0 h-1 rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: color }} />
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{label}</p>
+                        <p className="text-2xl font-black mt-1" style={{ color }}>
+                          {value !== null ? value.toFixed(0) : '—'}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">{unit}</p>
+                      </div>
+                      <span className="text-xs font-bold px-2 py-0.5 rounded-full border" style={{ color, borderColor: color + '55', backgroundColor: color + '15' }}>
+                        {status === 'GOOD' ? 'Good' : status === 'MODERATE' ? 'Moderate' : 'Danger'}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground leading-tight">{desc}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* ── Intelligence Engine Panel ──────────────────────────── */}
         {!isLoading && !isError && (
           <div className="glass-card rounded-2xl p-5 space-y-4">
@@ -292,7 +340,6 @@ export default function Dashboard() {
                 <Brain className="w-5 h-5 text-primary" />
                 AI Environmental Intelligence
               </h2>
-              {/* Overall risk badge */}
               <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
                 intel.overallRiskLevel === 'Critical' ? 'bg-rose-500/15 text-rose-500 border-rose-500/30' :
                 intel.overallRiskLevel === 'High'     ? 'bg-orange-500/15 text-orange-500 border-orange-500/30' :
@@ -318,6 +365,9 @@ export default function Dashboard() {
                   >
                     <Icon className="w-3.5 h-3.5" />
                     {tab.label}
+                    {tab.id === 'infections' && (criticalInfections.length > 0 || highInfections.length > 0) && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
+                    )}
                   </button>
                 );
               })}
@@ -332,11 +382,12 @@ export default function Dashboard() {
                 exit={{ opacity: 0, y: -8 }}
                 transition={{ duration: 0.2 }}
               >
-                {activeIntelTab === 'aqi'     && <AQIPanel aqi={intel.aqi} />}
-                {activeIntelTab === 'safety'  && <SafetyScoreWidget result={intel.safetyScore} />}
-                {activeIntelTab === 'health'  && <HealthRiskPanel risks={intel.healthRisks} />}
-                {activeIntelTab === 'pollen'  && <PollenPanel pollen={intel.pollen} />}
-                {activeIntelTab === 'sensors' && <SensorStatusPanel reliability={intel.reliability} />}
+                {activeIntelTab === 'aqi'        && <AQIPanel aqi={intel.aqi} />}
+                {activeIntelTab === 'safety'     && <SafetyScoreWidget result={intel.safetyScore} />}
+                {activeIntelTab === 'health'     && <HealthRiskPanel risks={intel.healthRisks} />}
+                {activeIntelTab === 'infections' && <InfectionsAllergiesPanel risks={intel.infectionsAllergies} />}
+                {activeIntelTab === 'pollen'     && <PollenPanel pollen={intel.pollen} />}
+                {activeIntelTab === 'sensors'    && <SensorStatusPanel reliability={intel.reliability} />}
               </motion.div>
             </AnimatePresence>
           </div>

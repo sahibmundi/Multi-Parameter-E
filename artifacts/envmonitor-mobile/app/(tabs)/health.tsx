@@ -1,5 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import * as Speech from 'expo-speech';
+import * as Haptics from 'expo-haptics';
 import React, { useState } from 'react';
 import { Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,7 +10,7 @@ import { generateHealthConditions, getOverallScore, AlertLevel } from '@/constan
 import { t, Lang } from '@/constants/translations';
 import { computeIntelligence } from '@/engines/intelligence';
 import type { HealthRisk } from '@/engines/health-risk';
-import * as Haptics from 'expo-haptics';
+import type { InfectionRisk } from '@/engines/infections-allergies';
 
 const LEVEL_COLORS: Record<AlertLevel, string> = {
   safe: '#00FF88', moderate: '#FFD700', unhealthy: '#FF8C00', severe: '#FF3366',
@@ -24,34 +25,80 @@ function speak(text: string, lang: Lang) {
   Speech.speak(text, { language: lang === 'pa' ? 'pa-IN' : lang === 'hi' ? 'hi-IN' : 'en-US', pitch: 0.95, rate: Platform.OS === 'ios' ? 0.5 : 0.9 });
 }
 
-function RiskCard({ risk, lang }: { risk: HealthRisk; lang: Lang }) {
+function HealthRiskCard({ risk, lang }: { risk: HealthRisk; lang: Lang }) {
   const [expanded, setExpanded] = useState(false);
   const c = RISK_COLORS[risk.riskLevel] ?? '#6B8CAE';
   return (
     <TouchableOpacity
       onPress={() => { Haptics.selectionAsync(); setExpanded(!expanded); }}
-      style={[styles.riskCard, { borderColor: c + '44' }]}
+      style={[styles.card, { borderColor: c + '44' }]}
       activeOpacity={0.8}
     >
-      <View style={styles.riskHeader}>
-        <View style={[styles.riskDot, { backgroundColor: c }]} />
-        <Text style={styles.riskName} numberOfLines={1}>{risk.condition}</Text>
-        <View style={[styles.riskBadge, { backgroundColor: c + '22', borderColor: c + '55' }]}>
-          <Text style={[styles.riskBadgeText, { color: c }]}>{risk.riskLevel}</Text>
+      <View style={styles.cardHeader}>
+        <View style={[styles.dot, { backgroundColor: c }]} />
+        <Text style={styles.cardName} numberOfLines={1}>{risk.condition}</Text>
+        <View style={[styles.badge, { backgroundColor: c + '22', borderColor: c + '55' }]}>
+          <Text style={[styles.badgeText, { color: c }]}>{risk.riskLevel}</Text>
         </View>
         <Feather name={expanded ? 'chevron-up' : 'chevron-down'} size={14} color="#6B8CAE" />
       </View>
       {expanded && (
-        <View style={styles.riskBody}>
-          <Text style={styles.riskDesc}>{risk.description}</Text>
+        <View style={styles.cardBody}>
+          <Text style={styles.cardDesc}>{risk.description}</Text>
           {risk.triggers.length > 0 && (
             <View style={styles.triggerRow}>
-              <Text style={styles.triggerLabel}>
-                {lang === 'pa' ? 'ਕਾਰਨ:' : lang === 'hi' ? 'कारण:' : 'Triggers:'}
-              </Text>
-              {risk.triggers.map((tr) => (
-                <View key={tr} style={styles.triggerChip}>
-                  <Text style={styles.triggerText}>{tr}</Text>
+              <Text style={styles.triggerLabel}>{lang === 'pa' ? 'ਕਾਰਨ:' : lang === 'hi' ? 'कारण:' : 'Triggers:'}</Text>
+              {risk.triggers.map(tr => (
+                <View key={tr} style={styles.triggerChip}><Text style={styles.triggerText}>{tr}</Text></View>
+              ))}
+            </View>
+          )}
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+}
+
+function InfectionCard({ risk, lang }: { risk: InfectionRisk; lang: Lang }) {
+  const [expanded, setExpanded] = useState(false);
+  const c = RISK_COLORS[risk.riskLevel] ?? '#6B8CAE';
+  return (
+    <TouchableOpacity
+      onPress={() => { Haptics.selectionAsync(); setExpanded(!expanded); }}
+      style={[styles.card, { borderColor: c + '44' }]}
+      activeOpacity={0.8}
+    >
+      <View style={styles.cardHeader}>
+        <Text style={{ fontSize: 16 }}>{risk.icon}</Text>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.cardName} numberOfLines={1}>{risk.name}</Text>
+          <Text style={[styles.catTag, { color: c + 'CC' }]}>{risk.category}</Text>
+        </View>
+        <View style={[styles.badge, { backgroundColor: c + '22', borderColor: c + '55' }]}>
+          <Text style={[styles.badgeText, { color: c }]}>{risk.riskLevel}</Text>
+        </View>
+        <Feather name={expanded ? 'chevron-up' : 'chevron-down'} size={14} color="#6B8CAE" />
+      </View>
+      {expanded && (
+        <View style={styles.cardBody}>
+          <Text style={styles.cardDesc}>{risk.description}</Text>
+          {risk.warnings.length > 0 && (
+            <View style={styles.warningBox}>
+              {risk.warnings.map(w => (
+                <View key={w} style={styles.warningRow}>
+                  <Feather name="alert-triangle" size={11} color="#FF3366" />
+                  <Text style={styles.warningText}>{w}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+          {risk.protections.length > 0 && (
+            <View style={styles.protList}>
+              <Text style={styles.protTitle}>{lang === 'pa' ? 'ਸੁਰੱਖਿਆ ਕਦਮ:' : lang === 'hi' ? 'सुरक्षा उपाय:' : 'Protective Actions:'}</Text>
+              {risk.protections.slice(0, 4).map(p => (
+                <View key={p} style={styles.protRow}>
+                  <Feather name="shield" size={11} color="#00F5FF" />
+                  <Text style={styles.protText}>{p}</Text>
                 </View>
               ))}
             </View>
@@ -62,10 +109,12 @@ function RiskCard({ risk, lang }: { risk: HealthRisk; lang: Lang }) {
   );
 }
 
+type TabId = 'infections' | 'health' | 'pollen' | 'sensors' | 'classic';
+
 export default function HealthScreen() {
   const insets = useSafeAreaInsets();
   const { readings, isLoading, refresh, lang } = useApp();
-  const [activeTab, setActiveTab] = useState<'classic' | 'risks' | 'pollen'>('risks');
+  const [activeTab, setActiveTab] = useState<TabId>('infections');
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const botPad = Platform.OS === 'web' ? 34 : insets.bottom;
 
@@ -80,26 +129,30 @@ export default function HealthScreen() {
   const conditions = generateHealthConditions(numericReadings);
   const intel      = computeIntelligence(readings);
 
-  const severeCount    = conditions.filter((c) => c.level === 'severe').length;
-  const unhealthyCount = conditions.filter((c) => c.level === 'unhealthy').length;
-  const moderateCount  = conditions.filter((c) => c.level === 'moderate').length;
+  const severeCount    = conditions.filter(c => c.level === 'severe').length;
+  const unhealthyCount = conditions.filter(c => c.level === 'unhealthy').length;
+  const moderateCount  = conditions.filter(c => c.level === 'moderate').length;
   const overallLevel: AlertLevel = severeCount > 0 ? 'severe' : unhealthyCount > 0 ? 'unhealthy' : moderateCount > 0 ? 'moderate' : 'safe';
   const overallColor = LEVEL_COLORS[overallLevel];
 
-  const critCount = intel.healthRisks.filter(r => r.riskLevel === 'Critical').length;
-  const highCount = intel.healthRisks.filter(r => r.riskLevel === 'High').length;
+  const critInfections = intel.infectionsAllergies.filter(r => r.riskLevel === 'Critical').length;
+  const highInfections = intel.infectionsAllergies.filter(r => r.riskLevel === 'High').length;
+  const sortedInfections = [...intel.infectionsAllergies].sort(
+    (a, b) => ['Critical','High','Moderate','Low'].indexOf(a.riskLevel) - ['Critical','High','Moderate','Low'].indexOf(b.riskLevel)
+  );
 
   const announceAll = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (conditions.length === 0) { speak(t(lang, 'noAlerts'), lang); return; }
-    const summary = conditions.map((c) => c.title[lang]).join('. ');
-    speak(`${lang === 'pa' ? 'ਸਕੋਰ' : lang === 'hi' ? 'स्कोर' : 'Score'} ${score}. ${summary}`, lang);
+    speak(conditions.map(c => c.title[lang]).join('. '), lang);
   };
 
-  const TABS = [
-    { id: 'risks' as const,   label: lang === 'pa' ? 'ਸਿਹਤ ਜੋਖਮ' : lang === 'hi' ? 'स्वास्थ्य जोखिम' : 'Health Risks' },
-    { id: 'pollen' as const,  label: lang === 'pa' ? 'ਪਰਾਗ' : lang === 'hi' ? 'पराग' : 'Pollen' },
-    { id: 'classic' as const, label: lang === 'pa' ? 'ਚੇਤਾਵਨੀਆਂ' : lang === 'hi' ? 'चेतावनियां' : 'Alerts' },
+  const TABS: { id: TabId; label: string }[] = [
+    { id: 'infections', label: lang === 'pa' ? 'ਇਨਫੈਕਸ਼ਨਾਂ' : lang === 'hi' ? 'संक्रमण' : 'Infections' },
+    { id: 'health',     label: lang === 'pa' ? 'ਸਿਹਤ ਜੋਖਮ' : lang === 'hi' ? 'स्वास्थ्य जोखिम' : 'Health Risks' },
+    { id: 'pollen',     label: lang === 'pa' ? 'ਪਰਾਗ' : lang === 'hi' ? 'पराग' : 'Pollen' },
+    { id: 'sensors',    label: lang === 'pa' ? 'ਸੈਂਸਰ' : lang === 'hi' ? 'सेंसर' : 'Sensors' },
+    { id: 'classic',    label: lang === 'pa' ? 'ਚੇਤਾਵਨੀਆਂ' : lang === 'hi' ? 'चेतावनियां' : 'Alerts' },
   ];
 
   return (
@@ -111,7 +164,7 @@ export default function HealthScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* AQI + Safety quick strip */}
+      {/* Quick strip */}
       <View style={styles.quickStrip}>
         <View style={[styles.stripItem, { borderColor: intel.aqi.color + '44' }]}>
           <Text style={[styles.stripValue, { color: intel.aqi.color }]}>{intel.aqi.score}</Text>
@@ -122,19 +175,19 @@ export default function HealthScreen() {
           <Text style={styles.stripLabel}>{lang === 'pa' ? 'ਸੁਰੱਖਿਆ' : lang === 'hi' ? 'सुरक्षा' : 'Safety'}</Text>
         </View>
         <View style={[styles.stripItem, { borderColor: overallColor + '44' }]}>
-          <Text style={[styles.stripValue, { color: overallColor, fontSize: 14 }]}>{overallLevel.toUpperCase()}</Text>
+          <Text style={[styles.stripValue, { color: overallColor, fontSize: 13 }]}>{overallLevel.toUpperCase()}</Text>
           <Text style={styles.stripLabel}>{lang === 'pa' ? 'ਸਥਿਤੀ' : lang === 'hi' ? 'स्थिति' : 'Status'}</Text>
         </View>
-        {(critCount > 0 || highCount > 0) && (
-          <View style={[styles.stripItem, { borderColor: '#ef4444' + '44' }]}>
-            <Text style={[styles.stripValue, { color: '#ef4444', fontSize: 14 }]}>{critCount > 0 ? `${critCount}⚠` : `${highCount}!`}</Text>
-            <Text style={styles.stripLabel}>{lang === 'pa' ? 'ਜੋਖਮ' : lang === 'hi' ? 'जोखिम' : critCount > 0 ? 'Critical' : 'High'}</Text>
-          </View>
-        )}
+        <View style={[styles.stripItem, { borderColor: critInfections > 0 ? '#ef4444' + '44' : '#eab308' + '44' }]}>
+          <Text style={[styles.stripValue, { color: critInfections > 0 ? '#ef4444' : '#eab308', fontSize: 18 }]}>
+            {critInfections > 0 ? critInfections : highInfections}
+          </Text>
+          <Text style={styles.stripLabel}>{critInfections > 0 ? 'Critical' : highInfections > 0 ? 'High Risk' : 'Infections'}</Text>
+        </View>
       </View>
 
-      {/* Tab selector */}
-      <View style={styles.tabBar}>
+      {/* Tab bar — scrollable */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabScroll} contentContainerStyle={styles.tabBar}>
         {TABS.map(tab => (
           <TouchableOpacity
             key={tab.id}
@@ -142,63 +195,132 @@ export default function HealthScreen() {
             style={[styles.tabBtn, activeTab === tab.id && styles.tabBtnActive]}
           >
             <Text style={[styles.tabLabel, activeTab === tab.id && styles.tabLabelActive]}>{tab.label}</Text>
+            {tab.id === 'infections' && (critInfections > 0 || highInfections > 0) && (
+              <View style={styles.tabDot} />
+            )}
           </TouchableOpacity>
         ))}
-      </View>
+      </ScrollView>
 
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: botPad + 24 }]}
         refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refresh} tintColor="#00F5FF" />}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── HEALTH RISKS TAB ── */}
-        {activeTab === 'risks' && (
+
+        {/* ── INFECTIONS & ALLERGIES ── */}
+        {activeTab === 'infections' && (
           <>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>
-                {lang === 'pa' ? '10 ਸਿਹਤ ਜੋਖਮ ਵਿਸ਼ਲੇਸ਼ਣ' : lang === 'hi' ? '10 स्वास्थ्य जोखिम विश्लेषण' : '10-Condition Health Risk Analysis'}
+                {lang === 'pa' ? '15 ਇਨਫੈਕਸ਼ਨ ਅਤੇ ਐਲਰਜੀ ਜੋਖਮ' : lang === 'hi' ? '15 संक्रमण और एलर्जी जोखिम' : '15 Infection & Allergy Risks'}
               </Text>
               <Text style={styles.sectionSub}>
-                {lang === 'pa' ? 'ਲਾਈਵ ਸੈਂਸਰ ਡੇਟਾ ਤੋਂ ਗਣਨਾ ਕੀਤੀ ਗਈ' : lang === 'hi' ? 'लाइव सेंसर डेटा से गणना' : 'Computed from live sensor combinations'}
+                {lang === 'pa' ? 'PMS7003 ਅਤੇ ਸਾਰੇ ਸੈਂਸਰ ਡੇਟਾ ਤੋਂ' : lang === 'hi' ? 'PMS7003 और सभी सेंसर डेटा से' : 'Computed from PMS7003 + all sensor data'}
               </Text>
             </View>
-            {intel.healthRisks.map(risk => (
-              <RiskCard key={risk.id} risk={risk} lang={lang} />
+
+            {/* Summary tiles */}
+            <View style={styles.summaryRow}>
+              {(['Critical', 'High', 'Moderate', 'Low'] as const).map(lvl => {
+                const n = intel.infectionsAllergies.filter(r => r.riskLevel === lvl).length;
+                const c = RISK_COLORS[lvl];
+                return (
+                  <View key={lvl} style={[styles.summaryTile, { borderColor: c + '44' }]}>
+                    <Text style={[styles.summaryNum, { color: c }]}>{n}</Text>
+                    <Text style={styles.summaryLabel}>{lvl}</Text>
+                  </View>
+                );
+              })}
+            </View>
+
+            {critInfections > 0 && (
+              <View style={styles.critBanner}>
+                <Feather name="alert-triangle" size={13} color="#FF3366" />
+                <Text style={styles.critText}>
+                  {lang === 'pa' ? `${critInfections} ਗੰਭੀਰ ਸਥਿਤੀਆਂ — ਤੁਰੰਤ ਕਾਰਵਾਈ ਕਰੋ`
+                    : lang === 'hi' ? `${critInfections} गंभीर स्थितियां — तुरंत कार्रवाई करें`
+                    : `${critInfections} critical condition${critInfections > 1 ? 's' : ''} — take immediate action`}
+                </Text>
+              </View>
+            )}
+
+            {sortedInfections.map(risk => (
+              <InfectionCard key={risk.id} risk={risk} lang={lang} />
             ))}
           </>
         )}
 
-        {/* ── POLLEN TAB ── */}
-        {activeTab === 'pollen' && (
+        {/* ── HEALTH RISKS ── */}
+        {activeTab === 'health' && (
           <>
-            <View style={[styles.pollenCard, { borderColor: intel.pollen.color + '44' }]}>
-              <Text style={[styles.pollenTitle, { color: intel.pollen.color }]}>
-                {lang === 'pa' ? 'ਪਰਾਗ ਗਤੀਵਿਧੀ' : lang === 'hi' ? 'पराग गतिविधि' : 'Pollen Activity'}
-              </Text>
-              <Text style={[styles.pollenValue, { color: intel.pollen.color }]}>{intel.pollen.pollenActivity}</Text>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>{lang === 'pa' ? '10 ਸਿਹਤ ਜੋਖਮ ਵਿਸ਼ਲੇਸ਼ਣ' : lang === 'hi' ? '10 स्वास्थ्य जोखिम' : '10-Condition Health Risk Analysis'}</Text>
+            </View>
+            {intel.healthRisks.map(risk => (
+              <HealthRiskCard key={risk.id} risk={risk} lang={lang} />
+            ))}
+          </>
+        )}
 
-              <View style={styles.pollenGrid}>
-                {[
-                  { label: lang === 'pa' ? 'ਐਲਰਜੀ ਖਤਰਾ' : lang === 'hi' ? 'एलर्जी जोखिम' : 'Allergy Risk', value: intel.pollen.allergyRisk },
-                  { label: lang === 'pa' ? 'ਬਾਹਰ ਸੁਰੱਖਿਆ' : lang === 'hi' ? 'बाहर सुरक्षा' : 'Outdoor Safety', value: `${intel.pollen.outdoorSafetyScore}/100` },
-                  { label: lang === 'pa' ? 'ਸਲਾਹ' : lang === 'hi' ? 'सुझाव' : 'Advice', value: intel.pollen.outdoorSafety },
-                ].map(item => (
-                  <View key={item.label} style={styles.pollenGridItem}>
-                    <Text style={styles.pollenGridLabel}>{item.label}</Text>
-                    <Text style={[styles.pollenGridValue, { color: intel.pollen.color }]}>{item.value}</Text>
+        {/* ── POLLEN ── */}
+        {activeTab === 'pollen' && (
+          <View style={[styles.pollenCard, { borderColor: intel.pollen.color + '44' }]}>
+            <Text style={[styles.pollenTitle, { color: intel.pollen.color }]}>{lang === 'pa' ? 'ਪਰਾਗ ਗਤੀਵਿਧੀ' : lang === 'hi' ? 'पराग गतिविधि' : 'Pollen Activity'}</Text>
+            <Text style={[styles.pollenValue, { color: intel.pollen.color }]}>{intel.pollen.pollenActivity}</Text>
+            <View style={styles.pollenGrid}>
+              {[
+                { label: lang === 'pa' ? 'ਐਲਰਜੀ ਖਤਰਾ' : lang === 'hi' ? 'एलर्जी जोखिम' : 'Allergy Risk', value: intel.pollen.allergyRisk },
+                { label: lang === 'pa' ? 'ਬਾਹਰ ਸੁਰੱਖਿਆ' : lang === 'hi' ? 'बाहर सुरक्षा' : 'Outdoor Safety', value: `${intel.pollen.outdoorSafetyScore}/100` },
+                { label: lang === 'pa' ? 'ਸਲਾਹ' : lang === 'hi' ? 'सुझाव' : 'Advice', value: intel.pollen.outdoorSafety },
+              ].map(item => (
+                <View key={item.label} style={styles.pollenGridItem}>
+                  <Text style={styles.pollenGridLabel}>{item.label}</Text>
+                  <Text style={[styles.pollenGridValue, { color: intel.pollen.color }]}>{item.value}</Text>
+                </View>
+              ))}
+            </View>
+            <View style={styles.pollenBar}>
+              <View style={[styles.pollenBarFill, { width: `${intel.pollen.outdoorSafetyScore}%` as any, backgroundColor: intel.pollen.color }]} />
+            </View>
+            <Text style={styles.pollenRec}>{intel.pollen.recommendation}</Text>
+          </View>
+        )}
+
+        {/* ── SENSOR STATUS ── */}
+        {activeTab === 'sensors' && (
+          <>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>{lang === 'pa' ? 'ਸੈਂਸਰ ਭਰੋਸੇਯੋਗਤਾ' : lang === 'hi' ? 'सेंसर विश्वसनीयता' : 'Sensor Reliability Monitor'}</Text>
+              <Text style={styles.sectionSub}>{lang === 'pa' ? 'ਔਫਲਾਈਨ, ਫ੍ਰੋਜ਼ਨ, ਸਪਾਈਕ ਅਤੇ ਅਵੈਧ ਰੀਡਿੰਗਾਂ ਦੀ ਖੋਜ' : lang === 'hi' ? 'ऑफलाइन, फ्रोजन, स्पाइक और अमान्य रीडिंग की पहचान' : 'Detects offline, frozen, spike, and invalid readings'}</Text>
+            </View>
+            {!intel.reliability.allHealthy && (
+              <View style={styles.maintBanner}>
+                <Feather name="tool" size={13} color="#FFD700" />
+                <Text style={styles.maintText}>
+                  {lang === 'pa'
+                    ? `ਰੱਖ-ਰਖਾਅ ਅਲਰਟ: ${intel.reliability.offlineCount > 0 ? `${intel.reliability.offlineCount} ਸੈਂਸਰ ਔਫਲਾਈਨ` : `${intel.reliability.degradedCount} ਸੈਂਸਰ ਅਸਧਾਰਨ ਰੀਡਿੰਗ`}`
+                    : lang === 'hi'
+                    ? `रखरखाव अलर्ट: ${intel.reliability.offlineCount > 0 ? `${intel.reliability.offlineCount} सेंसर ऑफलाइन` : `${intel.reliability.degradedCount} सेंसर असामान्य रीडिंग`}`
+                    : `Maintenance alert: ${intel.reliability.offlineCount > 0 ? `${intel.reliability.offlineCount} sensor(s) offline/invalid` : `${intel.reliability.degradedCount} sensor(s) abnormal`} — check hardware`}
+                </Text>
+              </View>
+            )}
+            <View style={styles.sensorGrid}>
+              {intel.reliability.sensors.map(sensor => (
+                <View key={sensor.id} style={[styles.sensorChip, { borderColor: sensor.color + '55' }]}>
+                  <View style={[styles.sensorDot, { backgroundColor: sensor.color }]} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.sensorName} numberOfLines={1}>{sensor.name}</Text>
+                    <Text style={[styles.sensorStatus, { color: sensor.color }]}>{sensor.status}</Text>
                   </View>
-                ))}
-              </View>
-
-              <View style={styles.pollenBar}>
-                <View style={[styles.pollenBarFill, { width: `${intel.pollen.outdoorSafetyScore}%` as any, backgroundColor: intel.pollen.color }]} />
-              </View>
-              <Text style={styles.pollenRec}>{intel.pollen.recommendation}</Text>
+                </View>
+              ))}
             </View>
           </>
         )}
 
-        {/* ── CLASSIC ALERTS TAB ── */}
+        {/* ── CLASSIC ALERTS ── */}
         {activeTab === 'classic' && (
           <>
             <View style={[styles.overallCard, { borderColor: overallColor + '44' }]}>
@@ -209,14 +331,7 @@ export default function HealthScreen() {
                 </View>
                 <View style={styles.overallInfo}>
                   <Text style={[styles.overallLevel, { color: overallColor }]}>{overallLevel.toUpperCase()}</Text>
-                  <Text style={styles.overallSub}>
-                    {lang === 'pa' ? `${conditions.length} ਸਰਗਰਮ ਚੇਤਾਵਨੀਆਂ` : lang === 'hi' ? `${conditions.length} सक्रिय चेतावनियां` : `${conditions.length} active alert${conditions.length !== 1 ? 's' : ''}`}
-                  </Text>
-                  <View style={styles.counters}>
-                    {severeCount > 0 && <View style={[styles.counter, { backgroundColor: '#FF336622', borderColor: '#FF336655' }]}><Text style={[styles.counterText, { color: '#FF3366' }]}>{severeCount} Severe</Text></View>}
-                    {unhealthyCount > 0 && <View style={[styles.counter, { backgroundColor: '#FF8C0022', borderColor: '#FF8C0055' }]}><Text style={[styles.counterText, { color: '#FF8C00' }]}>{unhealthyCount} Unhealthy</Text></View>}
-                    {moderateCount > 0 && <View style={[styles.counter, { backgroundColor: '#FFD70022', borderColor: '#FFD70055' }]}><Text style={[styles.counterText, { color: '#FFD700' }]}>{moderateCount} Moderate</Text></View>}
-                  </View>
+                  <Text style={styles.overallSub}>{conditions.length} active alert{conditions.length !== 1 ? 's' : ''}</Text>
                 </View>
               </View>
             </View>
@@ -227,21 +342,22 @@ export default function HealthScreen() {
                 <Text style={styles.safeSub}>{t(lang, 'noAlerts')}</Text>
               </View>
             )}
-            {conditions.map((c) => <HealthAlertCard key={c.id} condition={c} lang={lang} />)}
+            {conditions.map(c => <HealthAlertCard key={c.id} condition={c} lang={lang} />)}
           </>
         )}
 
         <Text style={styles.disclaimer}>
-          {lang === 'pa' ? '⚠ ਥ੍ਰੈਸ਼ਹੋਲਡ WHO/EPA ਦਿਸ਼ਾ-ਨਿਰਦੇਸ਼ਾਂ ਤੇ ਆਧਾਰਿਤ ਹਨ। ਡਾਕਟਰੀ ਸਲਾਹ ਦਾ ਬਦਲ ਨਹੀਂ।'
-            : lang === 'hi' ? '⚠ थ्रेशोल्ड WHO/EPA दिशानिर्देशों पर आधारित हैं। चिकित्सीय सलाह का विकल्प नहीं।'
-            : '⚠ Thresholds based on WHO/EPA guidelines. Not a substitute for medical advice.'}
+          {lang === 'pa' ? '⚠ WHO/EPA ਦਿਸ਼ਾ-ਨਿਰਦੇਸ਼ਾਂ ਤੇ ਆਧਾਰਿਤ। ਡਾਕਟਰੀ ਸਲਾਹ ਦਾ ਬਦਲ ਨਹੀਂ।'
+            : lang === 'hi' ? '⚠ WHO/EPA दिशानिर्देशों पर आधारित। चिकित्सीय सलाह का विकल्प नहीं।'
+            : '⚠ Based on WHO/EPA guidelines. Not a substitute for medical advice.'}
         </Text>
       </ScrollView>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const S = StyleSheet;
+const styles = S.create({
   root: { flex: 1, backgroundColor: '#0A1628' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(0,245,255,0.1)', backgroundColor: 'rgba(13,31,60,0.9)' },
   headerTitle: { fontSize: 15, fontWeight: '800', color: '#FFFFFF', flex: 1 },
@@ -250,27 +366,43 @@ const styles = StyleSheet.create({
   stripItem: { flex: 1, backgroundColor: '#0D1F3C', borderRadius: 10, borderWidth: 1, padding: 8, alignItems: 'center' },
   stripValue: { fontSize: 18, fontWeight: '800' },
   stripLabel: { fontSize: 9, color: '#6B8CAE', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 1 },
-  tabBar: { flexDirection: 'row', paddingHorizontal: 14, paddingVertical: 8, gap: 6, backgroundColor: 'rgba(13,31,60,0.4)' },
-  tabBtn: { flex: 1, paddingVertical: 7, paddingHorizontal: 4, borderRadius: 8, alignItems: 'center', backgroundColor: 'rgba(0,245,255,0.05)', borderWidth: 1, borderColor: 'rgba(0,245,255,0.1)' },
+  tabScroll: { maxHeight: 46, backgroundColor: 'rgba(13,31,60,0.4)', borderBottomWidth: 1, borderBottomColor: 'rgba(0,245,255,0.08)' },
+  tabBar: { paddingHorizontal: 14, paddingVertical: 8, gap: 6, flexDirection: 'row', alignItems: 'center' },
+  tabBtn: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, backgroundColor: 'rgba(0,245,255,0.05)', borderWidth: 1, borderColor: 'rgba(0,245,255,0.1)', flexDirection: 'row', alignItems: 'center', gap: 4 },
   tabBtnActive: { backgroundColor: 'rgba(0,245,255,0.15)', borderColor: 'rgba(0,245,255,0.4)' },
   tabLabel: { fontSize: 11, fontWeight: '700', color: '#6B8CAE' },
   tabLabelActive: { color: '#00F5FF' },
+  tabDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#FF3366' },
   content: { padding: 14, gap: 10 },
   sectionHeader: { gap: 2 },
   sectionTitle: { fontSize: 13, fontWeight: '800', color: '#FFFFFF' },
   sectionSub: { fontSize: 10, color: '#6B8CAE' },
-  riskCard: { backgroundColor: '#0D1F3C', borderWidth: 1, borderRadius: 12, overflow: 'hidden' },
-  riskHeader: { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 8 },
-  riskDot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
-  riskName: { flex: 1, fontSize: 12, fontWeight: '700', color: '#FFFFFF' },
-  riskBadge: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
-  riskBadgeText: { fontSize: 10, fontWeight: '800' },
-  riskBody: { paddingHorizontal: 12, paddingBottom: 12, gap: 8 },
-  riskDesc: { fontSize: 11, color: '#6B8CAE', lineHeight: 16 },
+  summaryRow: { flexDirection: 'row', gap: 8 },
+  summaryTile: { flex: 1, backgroundColor: '#0D1F3C', borderRadius: 10, borderWidth: 1, padding: 10, alignItems: 'center' },
+  summaryNum: { fontSize: 22, fontWeight: '800' },
+  summaryLabel: { fontSize: 9, color: '#6B8CAE', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  critBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(255,51,102,0.1)', borderWidth: 1, borderColor: 'rgba(255,51,102,0.3)', borderRadius: 10, padding: 10 },
+  critText: { flex: 1, color: '#FF3366', fontSize: 12, fontWeight: '600' },
+  card: { backgroundColor: '#0D1F3C', borderWidth: 1, borderRadius: 12, overflow: 'hidden' },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 8 },
+  dot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
+  cardName: { flex: 1, fontSize: 12, fontWeight: '700', color: '#FFFFFF' },
+  catTag: { fontSize: 9, fontWeight: '600', textTransform: 'uppercase' },
+  badge: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
+  badgeText: { fontSize: 10, fontWeight: '800' },
+  cardBody: { paddingHorizontal: 12, paddingBottom: 12, gap: 8 },
+  cardDesc: { fontSize: 11, color: '#6B8CAE', lineHeight: 16 },
   triggerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, alignItems: 'center' },
   triggerLabel: { fontSize: 10, color: '#6B8CAE', fontWeight: '700' },
   triggerChip: { backgroundColor: 'rgba(0,245,255,0.08)', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 },
   triggerText: { fontSize: 10, color: '#00F5FF', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
+  warningBox: { backgroundColor: 'rgba(255,51,102,0.08)', borderRadius: 8, padding: 8, gap: 5, borderWidth: 1, borderColor: 'rgba(255,51,102,0.2)' },
+  warningRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
+  warningText: { flex: 1, fontSize: 11, color: '#FF3366', fontWeight: '600', lineHeight: 15 },
+  protList: { gap: 5 },
+  protTitle: { fontSize: 10, color: '#6B8CAE', fontWeight: '700' },
+  protRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
+  protText: { flex: 1, fontSize: 11, color: '#CCDDEE', lineHeight: 15 },
   pollenCard: { backgroundColor: '#0D1F3C', borderWidth: 1, borderRadius: 14, padding: 16, gap: 10 },
   pollenTitle: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
   pollenValue: { fontSize: 32, fontWeight: '800' },
@@ -281,6 +413,13 @@ const styles = StyleSheet.create({
   pollenBar: { height: 6, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 3, overflow: 'hidden' },
   pollenBarFill: { height: '100%', borderRadius: 3 },
   pollenRec: { fontSize: 11, color: '#6B8CAE', lineHeight: 17 },
+  sensorGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  sensorChip: { width: '48%', backgroundColor: '#0D1F3C', borderWidth: 1, borderRadius: 10, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  sensorDot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
+  sensorName: { fontSize: 11, fontWeight: '700', color: '#FFFFFF' },
+  sensorStatus: { fontSize: 10, fontWeight: '600' },
+  maintBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(255,215,0,0.1)', borderWidth: 1, borderColor: 'rgba(255,215,0,0.3)', borderRadius: 10, padding: 10 },
+  maintText: { flex: 1, color: '#FFD700', fontSize: 11, fontWeight: '600' },
   overallCard: { backgroundColor: '#0D1F3C', borderWidth: 1, borderRadius: 16, padding: 16 },
   overallTop: { flexDirection: 'row', gap: 14, alignItems: 'center' },
   scoreBadge: { width: 72, height: 72, borderRadius: 36, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
@@ -289,9 +428,6 @@ const styles = StyleSheet.create({
   overallInfo: { flex: 1, gap: 4 },
   overallLevel: { fontSize: 18, fontWeight: '800', letterSpacing: 1 },
   overallSub: { color: '#6B8CAE', fontSize: 12 },
-  counters: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 4 },
-  counter: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
-  counterText: { fontSize: 10, fontWeight: '700' },
   safeCard: { backgroundColor: '#0D1F3C', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(0,255,136,0.3)', padding: 32, alignItems: 'center', gap: 10 },
   safeTitle: { fontSize: 20, fontWeight: '800', color: '#00FF88' },
   safeSub: { color: '#6B8CAE', fontSize: 13, textAlign: 'center', lineHeight: 19 },

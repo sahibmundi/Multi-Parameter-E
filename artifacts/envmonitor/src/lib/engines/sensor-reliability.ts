@@ -110,10 +110,14 @@ export const SENSOR_BOUNDS: Record<string, { min: number; max: number; name: str
   nh3:         { min: 0,      max: 500,   name: 'NH₃'         },
   benzene:     { min: 0,      max: 1000,  name: 'Benzene'     },
   lpg:         { min: 0,      max: 10000, name: 'LPG'         },
-  dust:        { min: 0,      max: 1000,  name: 'Dust PM2.5'  },
+  dust:        { min: 0,      max: 1000,  name: 'Dust (Optical)' },
   rain:        { min: 0,      max: 100,   name: 'Rain'        },
   pressure:    { min: 870,    max: 1085,  name: 'Pressure'    },
   temperature: { min: -40,    max: 85,    name: 'Temperature' },
   humidity:    { min: 0,      max: 100,   name: 'Humidity'    },
   altitude:    { min: -500,   max: 9000,  name: 'Altitude'    },
+  // PMS7003 particulate sensors
+  pms1:        { min: 0,      max: 1000,  name: 'PM1.0 (PMS7003)' },
+  pms25:       { min: 0,      max: 1000,  name: 'PM2.5 (PMS7003)' },
+  pms10:       { min: 0,      max: 2000,  name: 'PM10  (PMS7003)' },
 };

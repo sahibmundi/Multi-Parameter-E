@@ -18,7 +18,6 @@ export interface ThingSpeakResponse {
 
 const BASE = 'https://api.thingspeak.com';
 
-// Read API keys for private channels
 const API_KEYS: Record<string, string> = {
   '3307420': '14MJF61HHABCGD9P',
   '3307422': 'VJHHEWZOX2O3AX5Q',
@@ -66,17 +65,22 @@ export async function fetchHistory(channelId: string, results = 50): Promise<Thi
 }
 
 export interface SensorReadings {
-  CO2: number | null;
-  Smoke: number | null;
-  NH3: number | null;
-  Benzene: number | null;
-  LPG: number | null;
-  Dust: number | null;
-  Rain: number | null;
+  // Channel 1 — gas sensors
+  CO2:      number | null;
+  Smoke:    number | null;
+  NH3:      number | null;
+  Benzene:  number | null;
+  LPG:      number | null;
+  Dust:     number | null;
+  Rain:     number | null;
   Pressure: number | null;
+  // Channel 2 — climate + PMS7003 (fields 4–6)
   Temperature: number | null;
-  Humidity: number | null;
-  Altitude: number | null;
+  Humidity:    number | null;
+  Altitude:    number | null;
+  PMS1:        number | null;  // PM1.0  μg/m³
+  PMS25:       number | null;  // PM2.5  μg/m³
+  PMS10:       number | null;  // PM10   μg/m³
   timestamp: Date | null;
 }
 
@@ -98,6 +102,9 @@ export async function fetchAllReadings(
     Temperature: parseVal(f2?.field1),
     Humidity:    parseVal(f2?.field2),
     Altitude:    parseVal(f2?.field3),
+    PMS1:        parseVal(f2?.field4),
+    PMS25:       parseVal(f2?.field5),
+    PMS10:       parseVal(f2?.field6),
     timestamp:   f1?.created_at ? new Date(f1.created_at) : null,
   };
 }
@@ -125,6 +132,9 @@ export async function fetchSensorHistory(
     Temperature: { ch: '2', field: 'field1' },
     Humidity:    { ch: '2', field: 'field2' },
     Altitude:    { ch: '2', field: 'field3' },
+    PMS1:        { ch: '2', field: 'field4' },
+    PMS25:       { ch: '2', field: 'field5' },
+    PMS10:       { ch: '2', field: 'field6' },
   };
   const cfg = fieldMap[sensorId];
   if (!cfg) return [];
