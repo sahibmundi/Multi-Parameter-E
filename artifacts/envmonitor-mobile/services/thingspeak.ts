@@ -18,6 +18,16 @@ export interface ThingSpeakResponse {
 
 const BASE = 'https://api.thingspeak.com';
 
+// Read API keys for private channels
+const API_KEYS: Record<string, string> = {
+  '3307420': '14MJF61HHABCGD9P',
+  '3307422': 'VJHHEWZOX2O3AX5Q',
+};
+
+function getApiKey(channelId: string): string {
+  return API_KEYS[channelId] ?? '';
+}
+
 function parseVal(v: string | null | undefined): number | null {
   if (!v || v.trim() === '') return null;
   const n = parseFloat(v);
@@ -26,8 +36,10 @@ function parseVal(v: string | null | undefined): number | null {
 
 export async function fetchLatest(channelId: string): Promise<ThingSpeakFeed | null> {
   try {
-    const res = await fetch(`${BASE}/channels/${channelId}/feeds/last.json`, {
-      signal: AbortSignal.timeout(10000),
+    const key = getApiKey(channelId);
+    const keyParam = key ? `?api_key=${key}` : '';
+    const res = await fetch(`${BASE}/channels/${channelId}/feeds/last.json${keyParam}`, {
+      signal: AbortSignal.timeout(12000),
     });
     if (!res.ok) return null;
     const data: ThingSpeakFeed = await res.json();
@@ -39,8 +51,10 @@ export async function fetchLatest(channelId: string): Promise<ThingSpeakFeed | n
 
 export async function fetchHistory(channelId: string, results = 50): Promise<ThingSpeakFeed[]> {
   try {
+    const key = getApiKey(channelId);
+    const keyParam = key ? `&api_key=${key}` : '';
     const res = await fetch(
-      `${BASE}/channels/${channelId}/feeds.json?results=${results}`,
+      `${BASE}/channels/${channelId}/feeds.json?results=${results}${keyParam}`,
       { signal: AbortSignal.timeout(15000) }
     );
     if (!res.ok) return [];
