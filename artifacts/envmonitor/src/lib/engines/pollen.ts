@@ -5,7 +5,10 @@ export type OutdoorSafety = 'Safe' | 'Caution' | 'Limit Exposure' | 'Stay Indoor
 export interface PollenResult {
   pollenActivity: PollenActivity;
   allergyRisk: AllergyRisk;
-  outdoorSafetyScore: number; // 0–100
+  /** 0–100 risk-oriented score (higher = more pollen = more risk) — use this for penalty calculations */
+  activityScore: number;
+  /** 0–100 safety-oriented score (higher = safer outdoors) = 100 - activityScore */
+  outdoorSafetyScore: number;
   outdoorSafety: OutdoorSafety;
   recommendation: string;
   color: string;
@@ -107,5 +110,5 @@ export function calculatePollen(input: PollenInput): PollenResult {
   else if (score <= 80) color = '#f97316';
   else                   color = '#ef4444';
 
-  return { pollenActivity, allergyRisk, outdoorSafetyScore, outdoorSafety, recommendation, color };
+  return { pollenActivity, allergyRisk, activityScore: score, outdoorSafetyScore, outdoorSafety, recommendation, color };
 }

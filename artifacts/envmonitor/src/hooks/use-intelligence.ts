@@ -38,7 +38,7 @@ export function useIntelligence(
       smoke: unified.smoke, nh3: unified.nh3, benzene: unified.benzene,
       lpg: unified.lpg, temperature: unified.temperature,
       humidity: unified.humidity, rain: unified.rain,
-      pollenScore: pollen.outdoorSafetyScore,
+      pollenScore: pollen.activityScore,
     });
 
     const healthRisks = calculateHealthRisks({
