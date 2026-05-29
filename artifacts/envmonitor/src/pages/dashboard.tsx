@@ -1,16 +1,22 @@
 import { useState } from "react";
 import Layout from "@/components/layout";
 import { PARAMETERS, useSensorData, StatusLevel } from "@/hooks/use-sensor-data";
+import { useIntelligence } from "@/hooks/use-intelligence";
 import { ParameterCard } from "@/components/parameter-card";
 import { ParameterChart } from "@/components/parameter-chart";
 import { VoiceAssistantFAB } from "@/components/voice-assistant-fab";
+import { AQIPanel } from "@/components/aqi-panel";
+import { SafetyScoreWidget } from "@/components/safety-score-widget";
+import { HealthRiskPanel } from "@/components/health-risk-panel";
+import { PollenPanel } from "@/components/pollen-panel";
+import { SensorStatusPanel } from "@/components/sensor-status-panel";
 import { useTranslation } from "@/lib/i18n";
 import { useAppStore } from "@/lib/store";
 import { format } from "date-fns";
 import {
   AlertTriangle, Download, RefreshCw, Settings, X,
-  CheckCircle, Thermometer, Droplets, Gauge, CloudRain,
-  Wind, TrendingUp,
+  CheckCircle, Thermometer, Droplets, Gauge,
+  Shield, Brain, Flower2, Activity,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { exportToCSV } from "@/lib/utils";
@@ -22,22 +28,47 @@ const SCORE_COLOR = (s: number) =>
   s >= 60 ? { ring: 'score-ring-fill-mod',    text: 'text-amber-500   dark:text-amber-400',    bg: 'bg-amber-500/10'   } :
              { ring: 'score-ring-fill-danger', text: 'text-rose-500    dark:text-rose-400',     bg: 'bg-rose-500/10'    };
 
-// Compact weather-tile params for hero row
-const HERO_PARAMS = ['temperature', 'humidity', 'pressure', 'rain', 'co2', 'dust'] as const;
+type IntelTab = 'aqi' | 'safety' | 'health' | 'pollen' | 'sensors';
+
+const INTEL_TABS: { id: IntelTab; label: string; icon: React.ComponentType<{className?: string}> }[] = [
+  { id: 'aqi',     label: 'AQI',           icon: Activity   },
+  { id: 'safety',  label: 'Safety Score',  icon: Shield     },
+  { id: 'health',  label: 'Health Risks',  icon: Brain      },
+  { id: 'pollen',  label: 'Pollen',        icon: Flower2    },
+  { id: 'sensors', label: 'Sensor Status', icon: CheckCircle },
+];
 
 export default function Dashboard() {
   const { language } = useAppStore();
   const t = useTranslation(language);
   const { latestData, historicalData, score, dangerousCount, lastUpdated, isLoading, isError, raw } = useSensorData(100);
 
+  // Build typed sensor values for intelligence engines
+  const sensorValues = {
+    co2:         latestData['co2']?.value,
+    smoke:       latestData['smoke']?.value,
+    nh3:         latestData['nh3']?.value,
+    benzene:     latestData['benzene']?.value,
+    lpg:         latestData['lpg']?.value,
+    dust:        latestData['dust']?.value,
+    rain:        latestData['rain']?.value,
+    pressure:    latestData['pressure']?.value,
+    temperature: latestData['temperature']?.value,
+    humidity:    latestData['humidity']?.value,
+    altitude:    latestData['altitude']?.value,
+  };
+
+  const intel = useIntelligence(sensorValues, historicalData);
+
   const [selectedParamId, setSelectedParamId] = useState<string>(PARAMETERS[0].id);
   const [showConfig, setShowConfig] = useState(false);
+  const [activeIntelTab, setActiveIntelTab] = useState<IntelTab>('aqi');
   const [ch1Id, setCh1Id] = useState(() => localStorage.getItem('ts_channel1_id') || '3307420');
   const [ch2Id, setCh2Id] = useState(() => localStorage.getItem('ts_channel2_id') || '3307422');
   const queryClient = useQueryClient();
 
   const sc = SCORE_COLOR(score);
-  const circumference = 2 * Math.PI * 54; // r=54
+  const circumference = 2 * Math.PI * 54;
 
   const saveConfig = () => {
     if (ch1Id.trim()) localStorage.setItem('ts_channel1_id', ch1Id.trim());
@@ -55,8 +86,7 @@ export default function Dashboard() {
     exportToCSV(merged, 'env_monitor_full_export');
   };
 
-  // Dangerous params for alert list
-  const dangerParams = PARAMETERS.filter(p => latestData[p.id]?.status === 'DANGEROUS');
+  const dangerParams   = PARAMETERS.filter(p => latestData[p.id]?.status === 'DANGEROUS');
   const moderateParams = PARAMETERS.filter(p => latestData[p.id]?.status === 'MODERATE');
 
   return (
@@ -101,11 +131,9 @@ export default function Dashboard() {
                   <X className="w-4 h-4" />
                 </button>
               </div>
-
               <p className="text-sm text-muted-foreground mb-5 leading-relaxed">
                 Channels <span className="font-mono text-foreground">3307420</span> and <span className="font-mono text-foreground">3307422</span> are pre-configured. Update below to connect different sensors.
               </p>
-
               <div className="space-y-4">
                 {[
                   { label: 'Channel 1 ID', hint: 'CO₂, Smoke, NH₃, Benzene, LPG, Dust, Rain, Pressure', val: ch1Id, set: setCh1Id },
@@ -116,21 +144,17 @@ export default function Dashboard() {
                       {label} <span className="normal-case font-normal text-muted-foreground/60">— {hint}</span>
                     </label>
                     <input
-                      type="text"
-                      value={val}
-                      onChange={(e) => set(e.target.value)}
+                      type="text" value={val} onChange={(e) => set(e.target.value)}
                       className="w-full px-4 py-2.5 bg-secondary/50 border border-border rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 font-mono text-sm transition-shadow"
                     />
                   </div>
                 ))}
               </div>
-
               <button
                 onClick={saveConfig}
                 className="w-full mt-5 py-2.5 bg-primary text-primary-foreground font-bold rounded-xl hover:bg-primary/90 transition-colors shadow-lg flex items-center justify-center gap-2"
               >
-                <CheckCircle className="w-4 h-4" />
-                Save & Reconnect
+                <CheckCircle className="w-4 h-4" /> Save & Reconnect
               </button>
             </motion.div>
           </motion.div>
@@ -149,30 +173,23 @@ export default function Dashboard() {
           >
             <div className={`absolute inset-0 ${sc.bg} rounded-2xl pointer-events-none`} />
             <p className="font-display font-bold text-sm uppercase tracking-widest text-muted-foreground z-10">{t.overallScore}</p>
-
             <div className="relative z-10">
               <svg width="140" height="140" className="-rotate-90">
                 <circle cx="70" cy="70" r="54" strokeWidth="10" fill="none" className="score-ring-track" />
                 <circle
-                  cx="70" cy="70" r="54" strokeWidth="10" fill="none"
-                  strokeLinecap="round"
+                  cx="70" cy="70" r="54" strokeWidth="10" fill="none" strokeLinecap="round"
                   strokeDasharray={circumference}
                   strokeDashoffset={isLoading ? circumference : circumference - (circumference * score) / 100}
                   className={`${sc.ring} transition-all duration-1000 ease-out`}
                 />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className={`text-4xl font-display font-black ${sc.text}`}>
-                  {isLoading ? '—' : score}
-                </span>
+                <span className={`text-4xl font-display font-black ${sc.text}`}>{isLoading ? '—' : score}</span>
                 <span className="text-xs font-bold text-muted-foreground">/ 100</span>
               </div>
             </div>
-
             <div className="z-10 text-center">
-              <span className={`text-lg font-display font-bold ${sc.text}`}>
-                {isLoading ? '…' : SCORE_LABEL(score)}
-              </span>
+              <span className={`text-lg font-display font-bold ${sc.text}`}>{isLoading ? '…' : SCORE_LABEL(score)}</span>
               <p className="text-xs text-muted-foreground mt-1">
                 {lastUpdated ? `${t.lastUpdated}: ${format(lastUpdated, 'HH:mm:ss')}` : 'Connecting…'}
               </p>
@@ -187,18 +204,10 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <h2 className="font-display font-bold text-foreground text-lg">{t.aiInsights}</h2>
               <div className="flex gap-2">
-                <button
-                  onClick={() => setShowConfig(true)}
-                  className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-                  title="Settings"
-                >
+                <button onClick={() => setShowConfig(true)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors" title="Settings">
                   <Settings className="w-4 h-4" />
                 </button>
-                <button
-                  onClick={() => queryClient.invalidateQueries({ queryKey: ['thingspeak'] })}
-                  className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-                  title="Refresh"
-                >
+                <button onClick={() => queryClient.invalidateQueries({ queryKey: ['thingspeak'] })} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors" title="Refresh">
                   <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
                 </button>
               </div>
@@ -230,8 +239,7 @@ export default function Dashboard() {
                   <div className="flex flex-wrap gap-2">
                     {dangerParams.map(p => (
                       <span key={p.id} className="flex items-center gap-1 px-2.5 py-1 bg-rose-500/12 border border-rose-500/30 rounded-lg text-xs font-bold text-rose-600 dark:text-rose-400">
-                        <AlertTriangle className="w-3 h-3" />
-                        {t[p.nameKey as keyof typeof t] as string}
+                        <AlertTriangle className="w-3 h-3" /> {t[p.nameKey as keyof typeof t] as string}
                       </span>
                     ))}
                     {moderateParams.map(p => (
@@ -242,12 +250,12 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                {/* Quick weather snapshot */}
-                <div className="mt-auto grid grid-cols-3 gap-2">
+                {/* Quick weather snapshot + AQI badge */}
+                <div className="mt-auto grid grid-cols-4 gap-2">
                   {[
                     { id: 'temperature', icon: Thermometer, label: '°C' },
-                    { id: 'humidity',    icon: Droplets,    label: '%' },
-                    { id: 'pressure',    icon: Gauge,       label: 'hPa' },
+                    { id: 'humidity',    icon: Droplets,    label: '%'  },
+                    { id: 'pressure',    icon: Gauge,       label: 'hPa'},
                   ].map(({ id, icon: Icon, label }) => {
                     const d = latestData[id];
                     return (
@@ -262,11 +270,77 @@ export default function Dashboard() {
                       </div>
                     );
                   })}
+                  {/* AQI quick badge */}
+                  <div className="flex items-center gap-2 rounded-xl px-3 py-2" style={{ backgroundColor: intel.aqi.color + '18', border: `1px solid ${intel.aqi.color}33` }}>
+                    <Activity className="w-3.5 h-3.5 shrink-0" style={{ color: intel.aqi.color }} />
+                    <div>
+                      <p className="text-[10px] text-muted-foreground">AQI</p>
+                      <p className="text-sm font-bold leading-tight" style={{ color: intel.aqi.color }}>{intel.aqi.score}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
           </motion.div>
         </div>
+
+        {/* ── Intelligence Engine Panel ──────────────────────────── */}
+        {!isLoading && !isError && (
+          <div className="glass-card rounded-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-display font-bold text-xl text-foreground flex items-center gap-2">
+                <Brain className="w-5 h-5 text-primary" />
+                AI Environmental Intelligence
+              </h2>
+              {/* Overall risk badge */}
+              <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
+                intel.overallRiskLevel === 'Critical' ? 'bg-rose-500/15 text-rose-500 border-rose-500/30' :
+                intel.overallRiskLevel === 'High'     ? 'bg-orange-500/15 text-orange-500 border-orange-500/30' :
+                intel.overallRiskLevel === 'Moderate' ? 'bg-amber-500/15 text-amber-500 border-amber-500/30' :
+                                                        'bg-emerald-500/15 text-emerald-500 border-emerald-500/30'
+              }`}>
+                Overall Risk: {intel.overallRiskLevel}
+              </span>
+            </div>
+
+            {/* Tab bar */}
+            <div className="flex gap-1 bg-secondary/50 rounded-xl p-1 overflow-x-auto">
+              {INTEL_TABS.map(tab => {
+                const Icon = tab.icon;
+                const isActive = activeIntelTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveIntelTab(tab.id)}
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all shrink-0 ${
+                      isActive ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Tab content */}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeIntelTab}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.2 }}
+              >
+                {activeIntelTab === 'aqi'     && <AQIPanel aqi={intel.aqi} />}
+                {activeIntelTab === 'safety'  && <SafetyScoreWidget result={intel.safetyScore} />}
+                {activeIntelTab === 'health'  && <HealthRiskPanel risks={intel.healthRisks} />}
+                {activeIntelTab === 'pollen'  && <PollenPanel pollen={intel.pollen} />}
+                {activeIntelTab === 'sensors' && <SensorStatusPanel reliability={intel.reliability} />}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        )}
 
         {/* ── Sensor Grid ───────────────────────────────────────── */}
         <div>
@@ -281,7 +355,6 @@ export default function Dashboard() {
               <span className="hidden sm:inline">{t.downloadAll}</span>
             </button>
           </div>
-
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3">
             {PARAMETERS.map((config, i) => (
               <motion.div
